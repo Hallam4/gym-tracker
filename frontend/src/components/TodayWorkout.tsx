@@ -1,8 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
-import RestTimer from "./RestTimer";
 import { groupExercises } from "../utils/groupExercises";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
@@ -33,9 +32,24 @@ function savePendingWrites(writes: PendingWrite[]) {
 
 export default function TodayWorkout() {
   const [selectedType, setSelectedType] = useState<string>("U1");
-  const [restVisible, setRestVisible] = useState(false);
-  const [restSeconds, setRestSeconds] = useState(90);
+  const [workoutStart, setWorkoutStart] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (workoutStart === null) {
+      setElapsed(0);
+      return;
+    }
+    intervalRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - workoutStart) / 1000));
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [workoutStart]);
 
   const { data: session, isLoading, error } = useQuery({
     queryKey: ["workout-type", selectedType],
@@ -101,20 +115,6 @@ export default function TodayWorkout() {
     [session, logMutation]
   );
 
-  const handleStartRest = useCallback(
-    (exercise: WorkoutSession["exercises"][0], restIndex: number) => {
-      const restStr = exercise.rest_times[restIndex];
-      const parsedRest = parseInt(restStr);
-      setRestSeconds(parsedRest > 0 ? parsedRest : 90);
-      setRestVisible(true);
-    },
-    []
-  );
-
-  const handleRestComplete = useCallback((_elapsed: number) => {
-    setRestVisible(false);
-  }, []);
-
   if (isLoading) return <div className="text-center py-8 text-gray-400">Loading...</div>;
   if (error) return <div className="text-center py-8 text-red-400">Error loading workout</div>;
   if (!session) return null;
@@ -126,7 +126,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => setSelectedType(t)}
+            onClick={() => { setSelectedType(t); setWorkoutStart(Date.now()); }}
             className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap touch-target ${
               selectedType === t
                 ? "bg-blue-600 text-white"
@@ -143,6 +143,11 @@ export default function TodayWorkout() {
         <div className="text-sm text-gray-500">
           {session.day} {session.date && `— ${session.date}`}
         </div>
+        {workoutStart !== null && (
+          <div className="text-sm font-mono text-blue-400">
+            {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
+          </div>
+        )}
         <div className="text-xs text-gray-600">{session.tab_name}</div>
       </div>
 
@@ -158,7 +163,6 @@ export default function TodayWorkout() {
               exercise={ex}
               onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
               onWeightChange={(w) => handleWeightChange(ex, w)}
-              onStartRest={(restIdx) => handleStartRest(ex, restIdx)}
               className={group.isSuperset ? "mb-1" : "mb-3"}
             />
           ))}
@@ -178,12 +182,6 @@ export default function TodayWorkout() {
             : "Complete Workout"}
       </button>
 
-      <RestTimer
-        defaultSeconds={restSeconds}
-        onTimerComplete={handleRestComplete}
-        onDismiss={() => setRestVisible(false)}
-        visible={restVisible}
-      />
     </div>
   );
 }

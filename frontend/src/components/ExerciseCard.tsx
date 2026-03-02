@@ -5,7 +5,6 @@ interface Props {
   exercise: Exercise;
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
-  onStartRest: (restIndex: number) => void;
   className?: string;
 }
 
@@ -13,7 +12,6 @@ export default function ExerciseCard({
   exercise,
   onSetComplete,
   onWeightChange,
-  onStartRest,
   className = "mb-3",
 }: Props) {
   const [localWeight, setLocalWeight] = useState(exercise.weight);
@@ -43,14 +41,10 @@ export default function ExerciseCard({
       } else {
         newSets[setIndex] = targetReps;
         onSetComplete(setIndex, targetReps);
-        // Start rest timer (rest is between sets, so rest index = set index)
-        if (setIndex < totalSets - 1) {
-          onStartRest(setIndex);
-        }
       }
       setCompletedSets(newSets);
     },
-    [completedSets, targetReps, totalSets, onSetComplete, onStartRest]
+    [completedSets, targetReps, onSetComplete]
   );
 
   const handleRepsAdjust = useCallback(
