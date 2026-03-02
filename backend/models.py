@@ -11,6 +11,7 @@ class Exercise(BaseModel):
     rest_times: list[str]   # Rest 1-4
     notes: str
     sheet_row: int  # 0-indexed row in the sheet for write-back
+    superset_group: int  # exercises with same group number form a superset
 
 
 class WorkoutSession(BaseModel):

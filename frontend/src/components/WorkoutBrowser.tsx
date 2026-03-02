@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
+import { groupExercises } from "../utils/groupExercises";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -98,45 +99,52 @@ function WorkoutDetail({ session }: { session: WorkoutSession }) {
       </div>
 
       <div className="space-y-3">
-        {session.exercises.map((ex, i) => (
-          <div key={i} className="bg-gray-900 rounded-lg p-4">
-            <div className="font-medium text-white mb-2">{ex.name}</div>
-            <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
-              <div>
-                <span className="text-gray-600">Sets:</span> {ex.sets}
-              </div>
-              <div>
-                <span className="text-gray-600">Reps:</span> {ex.reps}
-              </div>
-              <div>
-                <span className="text-gray-600">Weight:</span> {ex.weight}
-              </div>
-            </div>
-            {ex.target && (
-              <div className="text-sm text-gray-500 mt-1">
-                Target: {ex.target}
-              </div>
+        {groupExercises(session.exercises).map((group) => (
+          <div key={group.groupId} className={group.isSuperset ? "border-l-4 border-blue-500 pl-3" : ""}>
+            {group.isSuperset && (
+              <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
             )}
-            {ex.set_results.some((s) => s) && (
-              <div className="mt-2 flex gap-2 flex-wrap text-sm">
-                {ex.set_results.map(
-                  (s, j) =>
-                    s && (
-                      <span
-                        key={j}
-                        className="bg-gray-800 px-2 py-1 rounded text-gray-300"
-                      >
-                        S{j + 1}: {s}
-                      </span>
-                    )
+            {group.exercises.map((ex, i) => (
+              <div key={i} className={`bg-gray-900 rounded-lg p-4 ${group.isSuperset ? "mb-1" : "mb-3"}`}>
+                <div className="font-medium text-white mb-2">{ex.name}</div>
+                <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
+                  <div>
+                    <span className="text-gray-600">Sets:</span> {ex.sets}
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Reps:</span> {ex.reps}
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Weight:</span> {ex.weight}
+                  </div>
+                </div>
+                {ex.target && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    Target: {ex.target}
+                  </div>
+                )}
+                {ex.set_results.some((s) => s) && (
+                  <div className="mt-2 flex gap-2 flex-wrap text-sm">
+                    {ex.set_results.map(
+                      (s, j) =>
+                        s && (
+                          <span
+                            key={j}
+                            className="bg-gray-800 px-2 py-1 rounded text-gray-300"
+                          >
+                            S{j + 1}: {s}
+                          </span>
+                        )
+                    )}
+                  </div>
+                )}
+                {ex.notes && (
+                  <div className="text-sm text-gray-500 mt-2 italic">
+                    {ex.notes}
+                  </div>
                 )}
               </div>
-            )}
-            {ex.notes && (
-              <div className="text-sm text-gray-500 mt-2 italic">
-                {ex.notes}
-              </div>
-            )}
+            ))}
           </div>
         ))}
       </div>

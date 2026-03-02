@@ -74,13 +74,20 @@ def parse_tab(tab_name: str, rows: list[list[str]]) -> WorkoutSession:
             except ValueError:
                 pass
 
-    # Parse exercise rows (after header, skip blank rows)
+    # Parse exercise rows with superset grouping (blank rows separate groups)
     exercises = []
+    current_group = 0
+    last_was_blank = True
     for i in range(header_row_idx + 1, len(rows)):
         row = rows[i]
         name = _safe_get(row, exercise_col)
         if not name:
+            last_was_blank = True
             continue
+
+        if last_was_blank and exercises:
+            current_group += 1
+        last_was_blank = False
 
         exercise = Exercise(
             name=name,
@@ -92,6 +99,7 @@ def parse_tab(tab_name: str, rows: list[list[str]]) -> WorkoutSession:
             rest_times=[_safe_get(row, c) for c in rest_cols],
             notes=_safe_get(row, notes_col) if notes_col is not None else "",
             sheet_row=i,
+            superset_group=current_group,
         )
         exercises.append(exercise)
 

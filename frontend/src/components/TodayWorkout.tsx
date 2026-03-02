@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
 import RestTimer from "./RestTimer";
+import { groupExercises } from "../utils/groupExercises";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -146,14 +147,22 @@ export default function TodayWorkout() {
       </div>
 
       {/* Exercise cards */}
-      {session.exercises.map((ex, i) => (
-        <ExerciseCard
-          key={`${session.tab_name}-${i}`}
-          exercise={ex}
-          onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
-          onWeightChange={(w) => handleWeightChange(ex, w)}
-          onStartRest={(restIdx) => handleStartRest(ex, restIdx)}
-        />
+      {groupExercises(session.exercises).map((group) => (
+        <div key={group.groupId} className={group.isSuperset ? "border-l-4 border-blue-500 pl-3 mb-3" : ""}>
+          {group.isSuperset && (
+            <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
+          )}
+          {group.exercises.map((ex, i) => (
+            <ExerciseCard
+              key={`${session.tab_name}-${group.groupId}-${i}`}
+              exercise={ex}
+              onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
+              onWeightChange={(w) => handleWeightChange(ex, w)}
+              onStartRest={(restIdx) => handleStartRest(ex, restIdx)}
+              className={group.isSuperset ? "mb-1" : "mb-3"}
+            />
+          ))}
+        </div>
       ))}
 
       {/* Complete workout button */}

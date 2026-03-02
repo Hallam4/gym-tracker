@@ -6,6 +6,7 @@ interface Props {
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
   onStartRest: (restIndex: number) => void;
+  className?: string;
 }
 
 export default function ExerciseCard({
@@ -13,6 +14,7 @@ export default function ExerciseCard({
   onSetComplete,
   onWeightChange,
   onStartRest,
+  className = "mb-3",
 }: Props) {
   const [localWeight, setLocalWeight] = useState(exercise.weight);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(
@@ -66,7 +68,7 @@ export default function ExerciseCard({
   const doneCount = completedSets.filter((s) => s !== null).length;
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 mb-3">
+    <div className={`bg-gray-900 rounded-lg p-4 ${className}`}>
       {/* Exercise header */}
       <div className="flex items-center justify-between mb-3">
         <div>

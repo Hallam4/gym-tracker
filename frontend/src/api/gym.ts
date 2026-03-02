@@ -10,6 +10,7 @@ export interface Exercise {
   rest_times: string[];
   notes: string;
   sheet_row: number;
+  superset_group: number;
 }
 
 export interface WorkoutSession {
