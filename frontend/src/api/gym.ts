@@ -1,6 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL
-  ? `https://${import.meta.env.VITE_API_URL}`
-  : "";
+const BASE = import.meta.env.VITE_API_URL || "";
 
 export interface Exercise {
   name: string;
