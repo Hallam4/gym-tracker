@@ -33,7 +33,7 @@ def _get_write_service():
         sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
         if not sa_json:
             raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON not set")
-        info = json.loads(sa_json)
+        info = json.loads(sa_json, strict=False)
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
