@@ -212,22 +212,39 @@ async def debug_sa_parse():
     """Temporary diagnostic for service account JSON parsing issues."""
     import json as json_mod
     import re as re_mod
+    from google.oauth2 import service_account as sa_mod
     sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
     cleaned = re_mod.sub(r'\n\s*', '', sa_json)
     try:
         info = json_mod.loads(cleaned)
         pk = info.get("private_key", "")
+        # Apply same PEM fix as sheets_client
+        pk_fixed = (
+            pk.replace('BEGINPRIVATEKEY', 'BEGIN PRIVATE KEY')
+              .replace('ENDPRIVATEKEY', 'END PRIVATE KEY')
+        )
+        info['private_key'] = pk_fixed
+        # Try to actually load credentials
+        try:
+            sa_mod.Credentials.from_service_account_info(
+                info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            )
+            creds_ok = True
+            creds_err = None
+        except Exception as e:
+            creds_ok = False
+            creds_err = str(e)[:300]
         return {
             "ok": True,
-            "cleaned_len": len(cleaned),
-            "keys": sorted(info.keys()),
-            "pk_len": len(pk),
-            "pk_start": pk[:40],
-            "pk_end": pk[-40:],
-            "pk_has_newlines": "\n" in pk,
+            "creds_ok": creds_ok,
+            "creds_err": creds_err,
+            "pk_len": len(pk_fixed),
+            "pk_start": pk_fixed[:45],
+            "pk_end": pk_fixed[-45:],
+            "pk_newline_count": pk_fixed.count("\n"),
         }
     except Exception as e:
-        return {"ok": False, "error": str(e), "cleaned_first_100": cleaned[:100]}
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/health")
