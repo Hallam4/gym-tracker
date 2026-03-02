@@ -27,9 +27,9 @@ def _ensure_history_tab():
         pass
 
 
-def append_workout(day: str, exercises: list[Exercise]):
+def append_workout(day: str, exercises: list[Exercise], workout_date: str | None = None):
     """Append completed exercises to the History tab."""
-    today = date.today().isoformat()
+    today = workout_date or date.today().isoformat()
     rows = []
     for ex in exercises:
         # Only log exercises that have at least one set recorded

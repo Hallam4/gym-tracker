@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import sheets_client
@@ -145,6 +146,38 @@ async def get_progress(exercise: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return ProgressResponse(exercise=exercise, history=data)
+
+
+@app.post("/api/history/backfill")
+async def backfill_history():
+    """Backfill the History tab from all existing workout tabs."""
+    try:
+        by_type = sheets_client.get_tabs_by_type()
+        processed = 0
+        errors = []
+        for wtype, tab_names in by_type.items():
+            for tab_name in tab_names:
+                try:
+                    rows = sheets_client.fetch_tab(tab_name)
+                    session = parser.parse_tab(tab_name, rows)
+                    # Convert human date like "2 February 2026" to ISO "2026-02-02"
+                    iso_date = None
+                    if session.date:
+                        try:
+                            iso_date = datetime.strptime(session.date, "%d %B %Y").strftime("%Y-%m-%d")
+                        except ValueError:
+                            errors.append(f"{tab_name}: could not parse date '{session.date}'")
+                            continue
+                    else:
+                        errors.append(f"{tab_name}: no date found")
+                        continue
+                    history.append_workout(session.day, session.exercises, workout_date=iso_date)
+                    processed += 1
+                except Exception as e:
+                    errors.append(f"{tab_name}: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "ok", "tabs_processed": processed, "errors": errors}
 
 
 @app.post("/api/cache/invalidate")
