@@ -38,6 +38,13 @@ def _get_write_service():
         # into the middle of JSON strings. Strip them to get valid JSON.
         cleaned = re.sub(r'\n\s*', '', sa_json)
         info = json.loads(cleaned)
+        # Fix PEM markers that lost spaces during line-wrap removal
+        if 'private_key' in info:
+            info['private_key'] = (
+                info['private_key']
+                .replace('BEGINPRIVATEKEY', 'BEGIN PRIVATE KEY')
+                .replace('ENDPRIVATEKEY', 'END PRIVATE KEY')
+            )
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
