@@ -5,6 +5,10 @@ import time
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
+# Regex to fix invalid JSON escape sequences (e.g. \p, \G) by double-escaping them.
+# Preserves valid JSON escapes: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+_INVALID_ESCAPE_RE = re.compile(r'\\(?!["\\/bfnrtu])')
+
 SPREADSHEET_ID = "1h_HHlAL8dZhHFRunnQvQDbGB73Q7SotiFxWy6bC5rf0"
 WORKOUT_TYPES = {"U1": "Upper 1", "U2": "Upper 2", "L1": "Lower 1", "L2": "Lower 2", "Arm": "Arms"}
 
@@ -33,7 +37,8 @@ def _get_write_service():
         sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
         if not sa_json:
             raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON not set")
-        info = json.loads(sa_json, strict=False)
+        fixed = _INVALID_ESCAPE_RE.sub(r'\\\\', sa_json)
+        info = json.loads(fixed)
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
