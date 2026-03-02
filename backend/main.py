@@ -150,18 +150,23 @@ async def get_progress(exercise: str):
 
 
 @app.post("/api/history/backfill")
-async def backfill_history():
-    """Backfill the History tab from all existing workout tabs."""
+async def backfill_history(offset: int = 0, limit: int = 10):
+    """Backfill the History tab from existing workout tabs.
+
+    Processes `limit` tabs starting at `offset` to stay within request timeouts.
+    Call repeatedly with increasing offset until remaining == 0.
+    """
     try:
         by_type = sheets_client.get_tabs_by_type()
-        processed = 0
-        errors = []
         all_tabs = [
             tab_name
             for tab_names in by_type.values()
             for tab_name in tab_names
         ]
-        for tab_name in all_tabs:
+        batch = all_tabs[offset:offset + limit]
+        processed = 0
+        errors = []
+        for tab_name in batch:
             try:
                 rows = sheets_client.fetch_tab(tab_name)
                 session = parser.parse_tab(tab_name, rows)
@@ -184,7 +189,15 @@ async def backfill_history():
             await asyncio.sleep(2.5)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"status": "ok", "tabs_processed": processed, "errors": errors}
+    remaining = max(0, len(all_tabs) - offset - limit)
+    return {
+        "status": "ok",
+        "tabs_processed": processed,
+        "total_tabs": len(all_tabs),
+        "offset": offset,
+        "remaining": remaining,
+        "errors": errors,
+    }
 
 
 @app.post("/api/cache/invalidate")
