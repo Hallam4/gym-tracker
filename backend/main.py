@@ -210,41 +210,24 @@ async def invalidate_cache():
 @app.get("/api/debug/sa-parse")
 async def debug_sa_parse():
     """Temporary diagnostic for service account JSON parsing issues."""
-    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-    # Show char codes around the problematic position (char 81)
-    context = sa_json[75:95] if len(sa_json) > 95 else sa_json[75:]
-    char_codes = [ord(c) for c in context]
-
     import json as json_mod
-    results = {}
-    strategies = [
-        ("plain", lambda s: json_mod.loads(s)),
-        ("strict_false", lambda s: json_mod.loads(s, strict=False)),
-        ("regex+strict", lambda s: json_mod.loads(
-            sheets_client._INVALID_ESCAPE_RE.sub(r'\\\\', s), strict=False
-        )),
-    ]
-    for name, fn in strategies:
-        try:
-            info = fn(sa_json)
-            pk = info.get("private_key", "")
-            results[name] = {
-                "ok": True,
-                "keys": sorted(info.keys()),
-                "pk_len": len(pk),
-                "pk_starts_begin": pk[:30],
-                "pk_ends_end": pk[-35:],
-                "pk_has_real_newlines": "\n" in pk,
-            }
-        except Exception as e:
-            results[name] = {"ok": False, "error": str(e)[:200]}
-
-    return {
-        "sa_len": len(sa_json),
-        "chars_75_95_repr": repr(context),
-        "chars_75_95_codes": char_codes,
-        "strategies": results,
-    }
+    import re as re_mod
+    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    cleaned = re_mod.sub(r'\n\s*', '', sa_json)
+    try:
+        info = json_mod.loads(cleaned)
+        pk = info.get("private_key", "")
+        return {
+            "ok": True,
+            "cleaned_len": len(cleaned),
+            "keys": sorted(info.keys()),
+            "pk_len": len(pk),
+            "pk_start": pk[:40],
+            "pk_end": pk[-40:],
+            "pk_has_newlines": "\n" in pk,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e), "cleaned_first_100": cleaned[:100]}
 
 
 @app.get("/health")
