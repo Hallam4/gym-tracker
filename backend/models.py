@@ -71,6 +71,7 @@ class ExerciseProgress(BaseModel):
     weight: float
     volume: float  # total reps * weight
     best_reps: int
+    estimated_1rm: float
 
 
 class ProgressResponse(BaseModel):

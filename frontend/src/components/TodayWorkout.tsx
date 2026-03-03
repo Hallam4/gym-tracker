@@ -344,6 +344,7 @@ export default function TodayWorkout() {
             setSummaryData(null);
             queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] });
             queryClient.invalidateQueries({ queryKey: ["streaks"] });
+            queryClient.invalidateQueries({ queryKey: ["prs"] });
             setToast({ message: "Workout saved!", type: "success" });
             setTimerSeconds(0);
             setTimerRunning(false);

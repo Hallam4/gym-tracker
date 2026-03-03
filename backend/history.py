@@ -121,12 +121,15 @@ def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
         best_reps = max(set_reps) if set_reps else 0
         volume = weight * total_reps
 
+        estimated_1rm = round(weight * (1 + best_reps / 30), 1) if weight > 0 and best_reps > 0 else 0.0
+
         progress.append(
             ExerciseProgress(
                 date=row.date,
                 weight=weight,
                 volume=volume,
                 best_reps=best_reps,
+                estimated_1rm=estimated_1rm,
             )
         )
 

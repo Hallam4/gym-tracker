@@ -41,6 +41,7 @@ export interface ExerciseProgress {
   weight: number;
   volume: number;
   best_reps: number;
+  estimated_1rm: number;
 }
 
 export interface ProgressResponse {

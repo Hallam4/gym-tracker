@@ -223,6 +223,46 @@ export default function ProgressCharts() {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Estimated 1RM over time */}
+          <div className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+            <h3 className="text-sm font-medium text-gray-400 mb-2">
+              Est. 1RM Over Time
+            </h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={chartData}>
+                <defs>
+                  <linearGradient id="gradE1RM" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={fmtDate}
+                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  axisLine={false}
+                />
+                <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Area
+                  type="monotone"
+                  dataKey="estimated_1rm"
+                  fill="url(#gradE1RM)"
+                  stroke="none"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="estimated_1rm"
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
