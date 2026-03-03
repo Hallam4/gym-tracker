@@ -88,3 +88,32 @@ class PREntry(BaseModel):
 
 class PRsResponse(BaseModel):
     prs: list[PREntry]
+
+
+class ExerciseSummary(BaseModel):
+    exercise: str
+    weight: float
+    prev_weight: float | None = None
+    weight_change: float | None = None
+    is_weight_pr: bool = False
+    is_1rm_pr: bool = False
+
+
+class WorkoutSummaryResponse(BaseModel):
+    status: str
+    exercises_logged: int
+    exercise_summaries: list[ExerciseSummary]
+    new_prs_count: int
+
+
+class StreakData(BaseModel):
+    current_streak: int  # consecutive weeks
+    best_streak: int
+    workouts_this_week: int
+    workouts_this_month: int
+    total_workouts: int
+    workout_dates: list[str]  # ISO date strings
+
+
+class StreakResponse(BaseModel):
+    streaks: StreakData

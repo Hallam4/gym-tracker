@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, WorkoutSession } from "../api/gym";
+import { api, WorkoutSession, WorkoutSummaryResponse } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
 import { groupExercises } from "../utils/groupExercises";
 import { useWriteQueue } from "../hooks/useWriteQueue";
 import { fmtDate } from "../utils/formatDate";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
+import WorkoutSummary from "./WorkoutSummary";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -44,6 +45,7 @@ export default function TodayWorkout() {
   const [groupLastSetTime, setGroupLastSetTime] = useState<Map<number, number>>(new Map());
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const [summaryData, setSummaryData] = useState<WorkoutSummaryResponse | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
@@ -89,9 +91,8 @@ export default function TodayWorkout() {
 
   const completeMutation = useMutation({
     mutationFn: (tabName: string) => api.completeWorkout(tabName),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] });
-      setToast({ message: "Workout saved!", type: "success" });
+    onSuccess: (data) => {
+      setSummaryData(data);
     },
     onError: () => {
       setToast({ message: "Failed to save workout", type: "error" });
@@ -330,6 +331,25 @@ export default function TodayWorkout() {
           message={toast.message}
           type={toast.type}
           onDismiss={() => setToast(null)}
+        />
+      )}
+
+      {/* Post-workout summary */}
+      {summaryData && (
+        <WorkoutSummary
+          data={summaryData}
+          totalSets={doneSets}
+          duration={timerSeconds}
+          onDismiss={() => {
+            setSummaryData(null);
+            queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] });
+            queryClient.invalidateQueries({ queryKey: ["streaks"] });
+            setToast({ message: "Workout saved!", type: "success" });
+            setTimerSeconds(0);
+            setTimerRunning(false);
+            setLastSetTime(null);
+            setGroupLastSetTime(new Map());
+          }}
         />
       )}
     </div>

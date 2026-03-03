@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { api } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
+import StreakDashboard from "./StreakDashboard";
 
 const tooltipStyle = {
   backgroundColor: "#111827",
@@ -55,6 +56,8 @@ export default function ProgressCharts() {
   return (
     <div>
       <h2 className="text-lg font-bold text-white mb-4">Progress</h2>
+
+      <StreakDashboard />
 
       {/* Exercise search */}
       <input

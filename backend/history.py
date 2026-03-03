@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 import sheets_client
-from models import Exercise, HistoryRow, ExerciseProgress, PREntry
+from models import Exercise, HistoryRow, ExerciseProgress, PREntry, ExerciseSummary, StreakData
 
 HISTORY_TAB = "History"
 HISTORY_HEADER = [
@@ -184,3 +184,132 @@ def get_prs() -> list[PREntry]:
 
     prs.sort(key=lambda p: p.exercise)
     return prs
+
+
+def compute_workout_summary(exercises: list[Exercise], today_date: str) -> list[ExerciseSummary]:
+    """Compute per-exercise summary comparing current session to prior history.
+
+    Must be called BEFORE append_workout so current session isn't in history.
+    """
+    history = get_all_history()
+
+    # Build per-exercise prior data: best weight, best 1RM, most recent weight
+    prior: dict[str, dict] = {}
+    for row in history:
+        name = row.exercise
+        if name not in prior:
+            prior[name] = {"best_weight": 0.0, "best_1rm": 0.0, "recent_weight": 0.0, "recent_date": ""}
+        w = _parse_weight(row.weight)
+        if w > prior[name]["best_weight"]:
+            prior[name]["best_weight"] = w
+        # Most recent by date
+        if row.date > prior[name]["recent_date"]:
+            prior[name]["recent_date"] = row.date
+            prior[name]["recent_weight"] = w
+        # Best 1RM
+        set_reps = [_parse_reps(s) for s in [row.set1, row.set2, row.set3, row.set4, row.set5] if s]
+        for reps in set_reps:
+            if reps > 0 and w > 0:
+                e1rm = w * (1 + reps / 30)
+                if e1rm > prior[name]["best_1rm"]:
+                    prior[name]["best_1rm"] = e1rm
+
+    summaries = []
+    for ex in exercises:
+        if not any(s for s in ex.set_results if s):
+            continue
+        w = _parse_weight(ex.weight)
+        set_reps = [_parse_reps(s) for s in ex.set_results if s]
+        current_1rm = max((w * (1 + r / 30) for r in set_reps if r > 0 and w > 0), default=0.0)
+
+        p = prior.get(ex.name)
+        prev_weight = p["recent_weight"] if p and p["recent_weight"] > 0 else None
+        weight_change = round(w - prev_weight, 2) if prev_weight is not None else None
+        is_weight_pr = w > p["best_weight"] if p and w > 0 else False
+        is_1rm_pr = current_1rm > p["best_1rm"] if p and current_1rm > 0 else False
+
+        summaries.append(ExerciseSummary(
+            exercise=ex.name,
+            weight=w,
+            prev_weight=prev_weight,
+            weight_change=weight_change,
+            is_weight_pr=is_weight_pr,
+            is_1rm_pr=is_1rm_pr,
+        ))
+
+    return summaries
+
+
+def get_streak_data() -> StreakData:
+    """Compute workout streak data from history."""
+    history = get_all_history()
+
+    # Extract distinct workout dates
+    dates_set: set[str] = set()
+    for row in history:
+        if row.date:
+            dates_set.add(row.date)
+
+    workout_dates = sorted(dates_set)
+    total_workouts = len(workout_dates)
+
+    today = date.today()
+
+    # This week (Monday = 0)
+    week_start = today - timedelta(days=today.weekday())
+    week_start_str = week_start.isoformat()
+    workouts_this_week = sum(1 for d in workout_dates if d >= week_start_str)
+
+    # This month
+    month_start_str = today.replace(day=1).isoformat()
+    workouts_this_month = sum(1 for d in workout_dates if d >= month_start_str)
+
+    # Weekly streaks: group dates into ISO weeks, walk backwards from current week
+    date_objects = []
+    for d_str in workout_dates:
+        try:
+            date_objects.append(datetime.strptime(d_str, "%Y-%m-%d").date())
+        except ValueError:
+            continue
+
+    weeks_with_workouts: set[tuple[int, int]] = set()
+    for d in date_objects:
+        iso = d.isocalendar()
+        weeks_with_workouts.add((iso[0], iso[1]))
+
+    # Walk backwards from current week
+    current_streak = 0
+    best_streak = 0
+    streak = 0
+    check = today
+    # Start from current week
+    while True:
+        iso = check.isocalendar()
+        if (iso[0], iso[1]) in weeks_with_workouts:
+            streak += 1
+            best_streak = max(best_streak, streak)
+        else:
+            if streak > 0 and current_streak == 0:
+                current_streak = streak
+            streak = 0
+        # Go to previous week
+        check = check - timedelta(weeks=1)
+        # Stop if we've gone past all history
+        if date_objects and check < date_objects[0] - timedelta(weeks=1):
+            break
+        if not date_objects:
+            break
+
+    # If we never broke the streak, current = streak
+    if current_streak == 0:
+        current_streak = streak
+    best_streak = max(best_streak, streak)
+
+    return StreakData(
+        current_streak=current_streak,
+        best_streak=best_streak,
+        workouts_this_week=workouts_this_week,
+        workouts_this_month=workouts_this_month,
+        total_workouts=total_workouts,
+        workout_dates=workout_dates,
+    )

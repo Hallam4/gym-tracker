@@ -60,6 +60,35 @@ export interface PRsResponse {
   prs: PREntry[];
 }
 
+export interface ExerciseSummary {
+  exercise: string;
+  weight: number;
+  prev_weight: number | null;
+  weight_change: number | null;
+  is_weight_pr: boolean;
+  is_1rm_pr: boolean;
+}
+
+export interface WorkoutSummaryResponse {
+  status: string;
+  exercises_logged: number;
+  exercise_summaries: ExerciseSummary[];
+  new_prs_count: number;
+}
+
+export interface StreakData {
+  current_streak: number;
+  best_streak: number;
+  workouts_this_week: number;
+  workouts_this_month: number;
+  total_workouts: number;
+  workout_dates: string[];
+}
+
+export interface StreakResponse {
+  streaks: StreakData;
+}
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(`${BASE}${url}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -86,10 +115,11 @@ export const api = {
   logWorkout: (tabName: string, updates: { row: number; col: number; value: string }[]) =>
     postJSON<{ status: string }>(`/api/workouts/tab/${encodeURIComponent(tabName)}/log`, { updates }),
   completeWorkout: (tabName: string) =>
-    postJSON<{ status: string; exercises_logged: number }>(
+    postJSON<WorkoutSummaryResponse>(
       `/api/workouts/tab/${encodeURIComponent(tabName)}/complete`
     ),
   getProgress: (exercise: string) =>
     fetchJSON<ProgressResponse>(`/api/progress/${encodeURIComponent(exercise)}`),
   getPRs: () => fetchJSON<PRsResponse>("/api/prs"),
+  getStreaks: () => fetchJSON<StreakResponse>("/api/streaks"),
 };

@@ -13,6 +13,8 @@ from models import (
     PRsResponse,
     TabInfo,
     TabsResponse,
+    WorkoutSummaryResponse,
+    StreakResponse,
 )
 
 app = FastAPI(title="Gym Tracker API")
@@ -119,16 +121,35 @@ async def log_workout(tab_name: str, req: LogWorkoutRequest):
     return {"status": "ok"}
 
 
-@app.post("/api/workouts/tab/{tab_name:path}/complete")
+@app.post("/api/workouts/tab/{tab_name:path}/complete", response_model=WorkoutSummaryResponse)
 async def complete_workout(tab_name: str):
-    """Mark a workout as complete — saves to History tab."""
+    """Mark a workout as complete — saves to History tab and returns summary."""
     try:
         rows = sheets_client.fetch_tab(tab_name)
         session = parser.parse_tab(tab_name, rows)
+        # Compute summary BEFORE appending so current session isn't in "prior" data
+        from datetime import date
+        summaries = history.compute_workout_summary(session.exercises, date.today().isoformat())
         history.append_workout(session.day, session.exercises)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"status": "ok", "exercises_logged": len(session.exercises)}
+    new_prs = sum(1 for s in summaries if s.is_weight_pr or s.is_1rm_pr)
+    return WorkoutSummaryResponse(
+        status="ok",
+        exercises_logged=len(summaries),
+        exercise_summaries=summaries,
+        new_prs_count=new_prs,
+    )
+
+
+@app.get("/api/streaks", response_model=StreakResponse)
+async def get_streaks():
+    """Get workout streak and consistency data."""
+    try:
+        data = history.get_streak_data()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return StreakResponse(streaks=data)
 
 
 @app.get("/api/prs", response_model=PRsResponse)
