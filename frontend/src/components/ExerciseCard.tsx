@@ -3,8 +3,13 @@ import { Exercise } from "../api/gym";
 
 const MAX_SETS = 5;
 
+function fmtTime(s: number) {
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
 interface Props {
   exercise: Exercise;
+  timerSeconds: number;
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
   onNotesChange?: (notes: string) => void;
@@ -15,6 +20,7 @@ interface Props {
 
 export default function ExerciseCard({
   exercise,
+  timerSeconds,
   onSetComplete,
   onWeightChange,
   onNotesChange,
@@ -30,6 +36,9 @@ export default function ExerciseCard({
     while (parsed.length < MAX_SETS) parsed.push(null);
     return parsed;
   });
+  const [setTimes, setSetTimes] = useState<(number | null)[]>(() =>
+    Array.from({ length: MAX_SETS }, () => null)
+  );
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -63,19 +72,23 @@ export default function ExerciseCard({
   const handleSetTap = useCallback(
     (setIndex: number) => {
       const newSets = [...completedSets];
+      const newTimes = [...setTimes];
       if (newSets[setIndex] !== null) {
         newSets[setIndex] = null;
+        newTimes[setIndex] = null;
         setJustCompleted(null);
       } else {
         newSets[setIndex] = targetReps;
+        newTimes[setIndex] = timerSeconds;
         onSetComplete(setIndex, targetReps);
         setJustCompleted(setIndex);
         if (popTimerRef.current) clearTimeout(popTimerRef.current);
         popTimerRef.current = setTimeout(() => setJustCompleted(null), 300);
       }
       setCompletedSets(newSets);
+      setSetTimes(newTimes);
     },
-    [completedSets, targetReps, onSetComplete]
+    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete]
   );
 
   const handleRepsAdjust = useCallback(
@@ -215,9 +228,11 @@ export default function ExerciseCard({
                   >
                     {label}
                   </button>
-                  <div className="text-[10px] text-gray-600 mt-0.5">
-                    /{targetReps}
-                  </div>
+                  {isDone && setTimes[i] != null && (
+                    <div className="text-[10px] font-mono text-gray-500 mt-0.5">
+                      {fmtTime(setTimes[i]!)}
+                    </div>
+                  )}
                   {isDone && (
                     <div className="flex justify-center gap-1">
                       <button

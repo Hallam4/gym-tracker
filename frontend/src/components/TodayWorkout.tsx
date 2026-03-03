@@ -39,6 +39,7 @@ export default function TodayWorkout() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [lastSetTime, setLastSetTime] = useState<number | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
@@ -118,8 +119,9 @@ export default function TodayWorkout() {
       if (!session) return;
       const setCol = 5 + setIndex; // Set 1-5 are columns 5-9
       writeQueue.enqueue({ row: exercise.sheet_row, col: setCol, value: reps.toString() });
+      setLastSetTime(timerSeconds);
     },
-    [session, writeQueue]
+    [session, writeQueue, timerSeconds]
   );
 
   const handleWeightChange = useCallback(
@@ -182,7 +184,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setSelectedType(t); }}
+            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setSelectedType(t); }}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
@@ -213,13 +215,18 @@ export default function TodayWorkout() {
           </span>
         </button>
         <button
-          onClick={() => { setTimerRunning(false); setTimerSeconds(0); }}
+          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); }}
           className="text-gray-500 text-sm bg-gray-800/50 rounded-lg px-2 py-2 active:scale-90 transition-transform duration-150"
           title="Reset"
         >
           &#8634;
         </button>
       </div>
+      {lastSetTime != null && (
+        <div className="text-center text-xs font-mono text-gray-500 -mt-2 mb-3">
+          Last set @ {Math.floor(lastSetTime / 60)}:{(lastSetTime % 60).toString().padStart(2, "0")}
+        </div>
+      )}
 
       {/* Progress bar */}
       {totalSets > 0 && (
@@ -253,6 +260,7 @@ export default function TodayWorkout() {
             <ExerciseCard
               key={`${session.tab_name}-${group.groupId}-${i}`}
               exercise={ex}
+              timerSeconds={timerSeconds}
               onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
               onWeightChange={(w) => handleWeightChange(ex, w)}
               onNotesChange={(notes) => handleNotesChange(ex, notes)}
