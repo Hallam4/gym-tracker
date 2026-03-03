@@ -9,6 +9,7 @@ export interface Exercise {
   set_results: string[];
   rest_times: string[];
   notes: string;
+  notes_col: number | null;
   sheet_row: number;
   superset_group: number;
 }

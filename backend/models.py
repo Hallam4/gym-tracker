@@ -10,6 +10,7 @@ class Exercise(BaseModel):
     set_results: list[str]  # Set 1-5
     rest_times: list[str]   # Rest 1-4
     notes: str
+    notes_col: int | None = None  # column index for notes write-back
     sheet_row: int  # 0-indexed row in the sheet for write-back
     superset_group: int  # exercises with same group number form a superset
 

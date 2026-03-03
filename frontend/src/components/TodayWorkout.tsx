@@ -142,6 +142,14 @@ export default function TodayWorkout() {
     [session, writeQueue]
   );
 
+  const handleNotesChange = useCallback(
+    (exercise: WorkoutSession["exercises"][0], notes: string) => {
+      if (!session || exercise.notes_col == null) return;
+      writeQueue.enqueue({ row: exercise.sheet_row, col: exercise.notes_col, value: notes });
+    },
+    [session, writeQueue]
+  );
+
   const handleProgressChange = useCallback(
     (key: string, done: number, total: number) => {
       setProgressMap((prev) => {
@@ -249,6 +257,7 @@ export default function TodayWorkout() {
               exercise={ex}
               onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
               onWeightChange={(w) => handleWeightChange(ex, w)}
+              onNotesChange={(notes) => handleNotesChange(ex, notes)}
               onProgressChange={(done, total) =>
                 handleProgressChange(`${group.groupId}-${i}`, done, total)
               }

@@ -7,6 +7,7 @@ interface Props {
   exercise: Exercise;
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
+  onNotesChange?: (notes: string) => void;
   onProgressChange?: (done: number, total: number) => void;
   className?: string;
 }
@@ -15,11 +16,13 @@ export default function ExerciseCard({
   exercise,
   onSetComplete,
   onWeightChange,
+  onNotesChange,
   onProgressChange,
   className = "mb-3",
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [localWeight, setLocalWeight] = useState(exercise.weight);
+  const [localNotes, setLocalNotes] = useState(exercise.notes);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
     const parsed = exercise.set_results.map((s) => (s ? parseInt(s) || null : null));
     while (parsed.length < MAX_SETS) parsed.push(null);
@@ -59,7 +62,6 @@ export default function ExerciseCard({
     (setIndex: number) => {
       const newSets = [...completedSets];
       if (newSets[setIndex] !== null) {
-        // Already done — toggle off
         newSets[setIndex] = null;
         setJustCompleted(null);
       } else {
@@ -84,6 +86,14 @@ export default function ExerciseCard({
       onSetComplete(setIndex, newReps);
     },
     [completedSets, targetReps, onSetComplete]
+  );
+
+  const handleNotesChange = useCallback(
+    (value: string) => {
+      setLocalNotes(value);
+      onNotesChange?.(value);
+    },
+    [onNotesChange]
   );
 
   return (
@@ -116,7 +126,7 @@ export default function ExerciseCard({
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
                 {exercise.sets} sets
               </span>
@@ -125,7 +135,7 @@ export default function ExerciseCard({
               </span>
               {exercise.target && (
                 <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                  Target {exercise.target}
+                  Target {exercise.target} @ {localWeight}kg
                 </span>
               )}
             </div>
@@ -225,10 +235,15 @@ export default function ExerciseCard({
             })}
           </div>
 
-          {/* Notes */}
-          {exercise.notes && (
-            <div className="text-sm text-gray-500 mt-3 italic">{exercise.notes}</div>
-          )}
+          {/* Notes — editable textarea */}
+          <textarea
+            value={localNotes}
+            onChange={(e) => handleNotesChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="Notes..."
+            rows={1}
+            className="w-full mt-3 bg-gray-800/50 text-sm text-gray-300 placeholder:text-gray-600 rounded-lg px-3 py-2 resize-y min-h-[36px] max-h-32 ring-1 ring-gray-700/50 focus:ring-blue-500/70 focus:outline-none transition-shadow"
+          />
         </div>
       </div>
     </div>

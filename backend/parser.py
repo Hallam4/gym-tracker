@@ -98,6 +98,7 @@ def parse_tab(tab_name: str, rows: list[list[str]]) -> WorkoutSession:
             set_results=[_safe_get(row, c) for c in set_cols],
             rest_times=[_safe_get(row, c) for c in rest_cols],
             notes=_safe_get(row, notes_col) if notes_col is not None else "",
+            notes_col=notes_col,
             sheet_row=i,
             superset_group=current_group,
         )
