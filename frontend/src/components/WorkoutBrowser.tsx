@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
 export default function WorkoutBrowser() {
   const [selectedType, setSelectedType] = useState<string>("U1");
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data: tabs } = useQuery({
     queryKey: ["tabs"],
@@ -42,6 +43,7 @@ export default function WorkoutBrowser() {
             onClick={() => {
               setSelectedType(t);
               setSelectedTab(null);
+              setSearch("");
             }}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
@@ -57,16 +59,27 @@ export default function WorkoutBrowser() {
       {/* Tab list or workout detail */}
       {!selectedTab ? (
         <div className="space-y-2">
-          {reversedTabs.map((tab) => (
-            <button
-              key={tab.tab_name}
-              onClick={() => setSelectedTab(tab.tab_name)}
-              className="w-full text-left px-4 py-3 bg-gray-900 rounded-xl text-gray-300 ring-1 ring-gray-800/60 transition-colors active:bg-gray-800 touch-target"
-            >
-              {fmtTabName(tab.tab_name)}
-            </button>
-          ))}
-          {reversedTabs.length === 0 && (
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter sessions..."
+            className="w-full bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 rounded-xl px-4 py-3"
+          />
+          {reversedTabs
+            .filter((tab) =>
+              fmtTabName(tab.tab_name).toLowerCase().includes(search.toLowerCase())
+            )
+            .map((tab) => (
+              <button
+                key={tab.tab_name}
+                onClick={() => setSelectedTab(tab.tab_name)}
+                className="w-full text-left px-4 py-3 bg-gray-900 rounded-xl text-gray-300 ring-1 ring-gray-800/60 transition-colors active:bg-gray-800 touch-target"
+              >
+                {fmtTabName(tab.tab_name)}
+              </button>
+            ))}
+          {reversedTabs.length === 0 && !search && (
             <div className="text-center py-8 text-gray-500">No sessions found</div>
           )}
         </div>
