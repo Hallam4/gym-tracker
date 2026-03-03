@@ -106,9 +106,12 @@ export default function ExerciseCard({
       const newReps = Math.max(0, current + delta);
       newSets[setIndex] = newReps;
       setCompletedSets(newSets);
+      const newTimes = [...setTimes];
+      newTimes[setIndex] = timerSeconds;
+      setSetTimes(newTimes);
       onSetComplete(setIndex, newReps);
     },
-    [completedSets, targetReps, onSetComplete]
+    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete]
   );
 
   const handleNotesChange = useCallback(
