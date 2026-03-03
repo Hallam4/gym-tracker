@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
 import { groupExercises } from "../utils/groupExercises";
+import Toast from "./Toast";
+import ConfirmModal from "./ConfirmModal";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -34,6 +36,9 @@ export default function TodayWorkout() {
   const [selectedType, setSelectedType] = useState<string>("U1");
   const [workoutStart, setWorkoutStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
@@ -56,13 +61,22 @@ export default function TodayWorkout() {
     queryFn: () => api.getWorkoutByType(selectedType),
   });
 
+  // Reset progress map when session changes
+  useEffect(() => {
+    setProgressMap(new Map());
+  }, [session?.tab_name]);
+
   const logMutation = useMutation({
     mutationFn: (vars: { tabName: string; updates: { row: number; col: number; value: string }[] }) =>
       api.logWorkout(vars.tabName, vars.updates),
+    onSuccess: () => {
+      setToast({ message: "Set logged", type: "success" });
+    },
     onError: (_err, vars) => {
       const pending = loadPendingWrites();
       pending.push(vars);
       savePendingWrites(pending);
+      setToast({ message: "Save failed — will retry", type: "error" });
     },
   });
 
@@ -70,6 +84,10 @@ export default function TodayWorkout() {
     mutationFn: (tabName: string) => api.completeWorkout(tabName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] });
+      setToast({ message: "Workout saved!", type: "success" });
+    },
+    onError: () => {
+      setToast({ message: "Failed to save workout", type: "error" });
     },
   });
 
@@ -115,6 +133,29 @@ export default function TodayWorkout() {
     [session, logMutation]
   );
 
+  const handleProgressChange = useCallback(
+    (key: string, done: number, total: number) => {
+      setProgressMap((prev) => {
+        const next = new Map(prev);
+        next.set(key, { done, total });
+        return next;
+      });
+    },
+    []
+  );
+
+  // Aggregate progress
+  let totalSets = 0;
+  let doneSets = 0;
+  for (const { done, total } of progressMap.values()) {
+    totalSets += total;
+    doneSets += done;
+  }
+  const progressPct = totalSets > 0 ? (doneSets / totalSets) * 100 : 0;
+
+  // Build confirm summary
+  const exerciseCount = session?.exercises.length ?? 0;
+
   if (isLoading) return <div className="text-center py-8 text-gray-400">Loading...</div>;
   if (error) return <div className="text-center py-8 text-red-400">Error loading workout</div>;
   if (!session) return null;
@@ -139,7 +180,7 @@ export default function TodayWorkout() {
       </div>
 
       {/* Workout info */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <div className="text-sm text-gray-500">
           {session.day} {session.date && `— ${session.date}`}
         </div>
@@ -150,6 +191,19 @@ export default function TodayWorkout() {
         )}
         <div className="text-xs text-gray-600">{session.tab_name}</div>
       </div>
+
+      {/* Progress bar */}
+      {totalSets > 0 && (
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 rounded-full transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-500 tabular-nums">{doneSets}/{totalSets}</span>
+        </div>
+      )}
 
       {/* Exercise cards */}
       {groupExercises(session.exercises).map((group) => (
@@ -163,6 +217,9 @@ export default function TodayWorkout() {
               exercise={ex}
               onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
               onWeightChange={(w) => handleWeightChange(ex, w)}
+              onProgressChange={(done, total) =>
+                handleProgressChange(`${group.groupId}-${i}`, done, total)
+              }
               className={group.isSuperset ? "mb-1" : "mb-3"}
             />
           ))}
@@ -171,7 +228,7 @@ export default function TodayWorkout() {
 
       {/* Complete workout button */}
       <button
-        onClick={() => completeMutation.mutate(session.tab_name)}
+        onClick={() => setConfirmVisible(true)}
         disabled={completeMutation.isPending}
         className="w-full mt-4 py-4 bg-green-700 text-white rounded-lg font-bold text-lg touch-target disabled:opacity-50"
       >
@@ -182,6 +239,27 @@ export default function TodayWorkout() {
             : "Complete Workout"}
       </button>
 
+      {/* Confirm modal */}
+      {confirmVisible && (
+        <ConfirmModal
+          title="Complete workout?"
+          summary={`${exerciseCount} exercises, ${doneSets}/${totalSets} sets completed`}
+          onCancel={() => setConfirmVisible(false)}
+          onConfirm={() => {
+            setConfirmVisible(false);
+            completeMutation.mutate(session.tab_name);
+          }}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

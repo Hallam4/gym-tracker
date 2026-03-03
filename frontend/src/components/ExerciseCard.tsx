@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Exercise } from "../api/gym";
 
 interface Props {
   exercise: Exercise;
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
+  onProgressChange?: (done: number, total: number) => void;
   className?: string;
 }
 
@@ -12,6 +13,7 @@ export default function ExerciseCard({
   exercise,
   onSetComplete,
   onWeightChange,
+  onProgressChange,
   className = "mb-3",
 }: Props) {
   const [localWeight, setLocalWeight] = useState(exercise.weight);
@@ -21,6 +23,12 @@ export default function ExerciseCard({
 
   const totalSets = parseInt(exercise.sets) || 3;
   const targetReps = parseInt(exercise.reps) || 10;
+
+  const doneCount = completedSets.filter((s) => s !== null).length;
+
+  useEffect(() => {
+    onProgressChange?.(doneCount, totalSets);
+  }, [doneCount, totalSets, onProgressChange]);
 
   const adjustWeight = useCallback(
     (delta: number) => {
@@ -58,8 +66,6 @@ export default function ExerciseCard({
     },
     [completedSets, targetReps, onSetComplete]
   );
-
-  const doneCount = completedSets.filter((s) => s !== null).length;
 
   return (
     <div className={`bg-gray-900 rounded-lg p-4 ${className}`}>
