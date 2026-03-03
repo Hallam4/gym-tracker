@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import { groupExercises } from "../utils/groupExercises";
+import { fmtDate } from "../utils/formatDate";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -95,7 +96,7 @@ function WorkoutDetail({ session }: { session: WorkoutSession }) {
   return (
     <div>
       <div className="text-sm text-gray-500 mb-4">
-        {session.day} {session.date && `— ${session.date}`}
+        {session.day} {session.date && `— ${fmtDate(session.date)}`}
       </div>
 
       <div className="space-y-3">

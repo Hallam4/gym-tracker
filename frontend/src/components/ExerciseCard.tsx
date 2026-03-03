@@ -17,6 +17,8 @@ interface Props {
   onProgressChange?: (done: number, total: number) => void;
   hideSetInfo?: boolean;
   className?: string;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export default function ExerciseCard({
@@ -29,8 +31,12 @@ export default function ExerciseCard({
   onProgressChange,
   hideSetInfo,
   className = "mb-3",
+  expanded: controlledExpanded,
+  onToggleExpand,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const isExpanded = controlledExpanded ?? localExpanded;
+  const toggleExpand = onToggleExpand ?? (() => setLocalExpanded((e) => !e));
   const [localWeight, setLocalWeight] = useState(exercise.weight);
   const [localNotes, setLocalNotes] = useState(exercise.notes);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
@@ -118,12 +124,12 @@ export default function ExerciseCard({
       {/* Exercise header */}
       <div
         className="flex items-center justify-between cursor-pointer select-none"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={toggleExpand}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={`text-gray-500 text-sm transition-transform duration-200 shrink-0 ${
-              expanded ? "rotate-90" : ""
+              isExpanded ? "rotate-90" : ""
             }`}
           >
             ▸
@@ -170,7 +176,7 @@ export default function ExerciseCard({
       {/* Expand/collapse with CSS grid animation */}
       <div
         className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-          expanded ? "grid-rows-expand" : "grid-rows-collapse"
+          isExpanded ? "grid-rows-expand" : "grid-rows-collapse"
         }`}
       >
         <div className="grid-expand-inner">

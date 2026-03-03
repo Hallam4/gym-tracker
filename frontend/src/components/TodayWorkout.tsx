@@ -4,6 +4,7 @@ import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
 import { groupExercises } from "../utils/groupExercises";
 import { useWriteQueue } from "../hooks/useWriteQueue";
+import { fmtDate } from "../utils/formatDate";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 
@@ -42,6 +43,7 @@ export default function TodayWorkout() {
   const [lastSetTime, setLastSetTime] = useState<number | null>(null);
   const [groupLastSetTime, setGroupLastSetTime] = useState<Map<number, number>>(new Map());
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
@@ -146,6 +148,14 @@ export default function TodayWorkout() {
     [session, writeQueue]
   );
 
+  const toggleGroup = useCallback((groupId: number) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+      return next;
+    });
+  }, []);
+
   const handleProgressChange = useCallback(
     (key: string, done: number, total: number) => {
       setProgressMap((prev) => {
@@ -205,7 +215,7 @@ export default function TodayWorkout() {
       {/* Workout info */}
       <div className="flex items-center justify-between mb-2">
         <div className="text-sm text-gray-500">
-          {session.day} {session.date && `— ${session.date}`}
+          {session.day} {session.date && `— ${fmtDate(session.date)}`}
         </div>
         <div className="text-xs text-gray-600">{session.tab_name}</div>
       </div>
@@ -276,6 +286,12 @@ export default function TodayWorkout() {
               }
               hideSetInfo={group.isSuperset}
               className={group.isSuperset ? "mb-1" : "mb-3"}
+              {...(group.isSuperset
+                ? {
+                    expanded: expandedGroups.has(group.groupId),
+                    onToggleExpand: () => toggleGroup(group.groupId),
+                  }
+                : {})}
             />
           ))}
         </div>

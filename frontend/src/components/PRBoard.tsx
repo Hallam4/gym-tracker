@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/gym";
+import { fmtDate } from "../utils/formatDate";
 
 export default function PRBoard() {
   const { data, isLoading, error } = useQuery({
@@ -56,14 +57,14 @@ export default function PRBoard() {
                   <div className={`text-lg font-bold ${recentWeight ? "text-yellow-400" : "text-white"}`}>
                     {pr.best_weight} <span className="text-sm text-gray-500">kg</span>
                   </div>
-                  <div className="text-xs text-gray-600">{pr.best_weight_date}</div>
+                  <div className="text-xs text-gray-600">{fmtDate(pr.best_weight_date)}</div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-3">
                   <div className="text-gray-500 mb-1">Est. 1RM</div>
                   <div className={`text-lg font-bold ${recent1rm ? "text-yellow-400" : "text-white"}`}>
                     {pr.estimated_1rm.toFixed(1)} <span className="text-sm text-gray-500">kg</span>
                   </div>
-                  <div className="text-xs text-gray-600">{pr.estimated_1rm_date}</div>
+                  <div className="text-xs text-gray-600">{fmtDate(pr.estimated_1rm_date)}</div>
                 </div>
               </div>
             </div>
