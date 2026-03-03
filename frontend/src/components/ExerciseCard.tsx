@@ -18,6 +18,7 @@ export default function ExerciseCard({
   onProgressChange,
   className = "mb-3",
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const [localWeight, setLocalWeight] = useState(exercise.weight);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
     const parsed = exercise.set_results.map((s) => (s ? parseInt(s) || null : null));
@@ -75,14 +76,20 @@ export default function ExerciseCard({
   return (
     <div className={`bg-gray-900 rounded-lg p-4 ${className}`}>
       {/* Exercise header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <div className="font-medium text-white">{exercise.name}</div>
-          <div className="text-sm text-gray-500">
-            {exercise.sets} × {exercise.reps} reps
-            {exercise.target && (
-              <span className="text-blue-400"> · Target: {exercise.target}</span>
-            )}
+      <div
+        className="flex items-center justify-between cursor-pointer select-none"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 text-sm">{expanded ? "▾" : "▸"}</span>
+          <div>
+            <div className="font-medium text-white">{exercise.name}</div>
+            <div className="text-sm text-gray-500">
+              {exercise.sets} Sets, {exercise.reps} Reps
+              {exercise.target && (
+                <span className="text-blue-400">, Target {exercise.target}</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="text-sm text-gray-500">
@@ -93,92 +100,96 @@ export default function ExerciseCard({
         </div>
       </div>
 
-      {/* Weight adjuster */}
-      <div className="flex items-center justify-center gap-4 mb-4">
-        <button
-          onClick={() => adjustWeight(-2.5)}
-          className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
-        >
-          -
-        </button>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-white">{localWeight}</div>
-          <div className="text-xs text-gray-500">kg</div>
-        </div>
-        <button
-          onClick={() => adjustWeight(2.5)}
-          className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
-        >
-          +
-        </button>
-      </div>
-
-      {/* Set buttons */}
-      <div className="grid grid-cols-5 gap-2">
-        {Array.from({ length: MAX_SETS }, (_, i) => {
-          const isBonus = i >= totalSets;
-          const isDone = completedSets[i] !== null;
-          const reps = completedSets[i];
-
-          let btnClass: string;
-          if (isDone) {
-            if (isBonus) {
-              btnClass = "bg-blue-800 text-blue-200";
-            } else if (reps! >= targetReps) {
-              btnClass = "bg-green-700 text-white";
-            } else {
-              btnClass = "bg-amber-700 text-white";
-            }
-          } else if (isBonus) {
-            btnClass = "bg-gray-800/50 text-gray-600 border border-dashed border-gray-700";
-          } else {
-            btnClass = "bg-gray-800 text-gray-400";
-          }
-
-          let label: React.ReactNode;
-          if (isDone) {
-            label = reps;
-          } else if (isBonus) {
-            label = "+";
-          } else {
-            label = `S${i + 1}`;
-          }
-
-          return (
-            <div key={i} className="text-center">
-              <button
-                onClick={() => handleSetTap(i)}
-                className={`w-full h-12 rounded-lg font-bold text-lg touch-target ${btnClass}`}
-              >
-                {label}
-              </button>
-              <div className="text-[10px] text-gray-600 mt-0.5">
-                /{targetReps}
-              </div>
-              {isDone && (
-                <div className="flex justify-center gap-1">
-                  <button
-                    onClick={() => handleRepsAdjust(i, -1)}
-                    className="text-xs text-gray-500 px-1"
-                  >
-                    -
-                  </button>
-                  <button
-                    onClick={() => handleRepsAdjust(i, 1)}
-                    className="text-xs text-gray-500 px-1"
-                  >
-                    +
-                  </button>
-                </div>
-              )}
+      {expanded && (
+        <>
+          {/* Weight adjuster */}
+          <div className="flex items-center justify-center gap-4 mb-4 mt-3">
+            <button
+              onClick={() => adjustWeight(-2.5)}
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
+            >
+              -
+            </button>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">{localWeight}</div>
+              <div className="text-xs text-gray-500">kg</div>
             </div>
-          );
-        })}
-      </div>
+            <button
+              onClick={() => adjustWeight(2.5)}
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
+            >
+              +
+            </button>
+          </div>
 
-      {/* Notes */}
-      {exercise.notes && (
-        <div className="text-sm text-gray-500 mt-3 italic">{exercise.notes}</div>
+          {/* Set buttons */}
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: MAX_SETS }, (_, i) => {
+              const isBonus = i >= totalSets;
+              const isDone = completedSets[i] !== null;
+              const reps = completedSets[i];
+
+              let btnClass: string;
+              if (isDone) {
+                if (isBonus) {
+                  btnClass = "bg-blue-800 text-blue-200";
+                } else if (reps! >= targetReps) {
+                  btnClass = "bg-green-700 text-white";
+                } else {
+                  btnClass = "bg-amber-700 text-white";
+                }
+              } else if (isBonus) {
+                btnClass = "bg-gray-800/50 text-gray-600 border border-dashed border-gray-700";
+              } else {
+                btnClass = "bg-gray-800 text-gray-400";
+              }
+
+              let label: React.ReactNode;
+              if (isDone) {
+                label = reps;
+              } else if (isBonus) {
+                label = "+";
+              } else {
+                label = `S${i + 1}`;
+              }
+
+              return (
+                <div key={i} className="text-center">
+                  <button
+                    onClick={() => handleSetTap(i)}
+                    className={`w-full h-12 rounded-lg font-bold text-lg touch-target ${btnClass}`}
+                  >
+                    {label}
+                  </button>
+                  <div className="text-[10px] text-gray-600 mt-0.5">
+                    /{targetReps}
+                  </div>
+                  {isDone && (
+                    <div className="flex justify-center gap-1">
+                      <button
+                        onClick={() => handleRepsAdjust(i, -1)}
+                        className="text-xs text-gray-500 px-1"
+                      >
+                        -
+                      </button>
+                      <button
+                        onClick={() => handleRepsAdjust(i, 1)}
+                        className="text-xs text-gray-500 px-1"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Notes */}
+          {exercise.notes && (
+            <div className="text-sm text-gray-500 mt-3 italic">{exercise.notes}</div>
+          )}
+        </>
       )}
     </div>
   );
