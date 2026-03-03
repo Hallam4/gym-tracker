@@ -26,7 +26,7 @@ export default function ExerciseCard({
   });
 
   const totalSets = parseInt(exercise.sets) || 3;
-  const targetReps = parseInt(exercise.reps) || 10;
+  const targetReps = parseInt(exercise.target) || parseInt(exercise.reps) || 10;
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
@@ -79,8 +79,10 @@ export default function ExerciseCard({
         <div>
           <div className="font-medium text-white">{exercise.name}</div>
           <div className="text-sm text-gray-500">
-            {exercise.sets} x {exercise.reps}
-            {exercise.target && ` — ${exercise.target}`}
+            {exercise.sets} × {exercise.reps} reps
+            {exercise.target && (
+              <span className="text-blue-400"> · Target: {exercise.target}</span>
+            )}
           </div>
         </div>
         <div className="text-sm text-gray-500">
