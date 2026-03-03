@@ -157,11 +157,13 @@ export default function ExerciseCard({
                 </span>
               )}
             </div>
-            {!hideSetInfo && (
+            {(
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                  {exercise.sets} sets
-                </span>
+                {!hideSetInfo && (
+                  <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                    {exercise.sets} sets
+                  </span>
+                )}
                 <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
                   {exercise.reps} reps
                 </span>

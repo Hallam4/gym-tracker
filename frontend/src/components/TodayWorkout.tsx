@@ -268,7 +268,7 @@ export default function TodayWorkout() {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-semibold text-blue-400">Superset</span>
               <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                {group.exercises[0].sets} sets x {group.exercises[0].reps} reps
+                {group.exercises[0].sets} sets
               </span>
             </div>
           )}
