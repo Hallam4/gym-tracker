@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import { groupExercises } from "../utils/groupExercises";
-import { fmtDate } from "../utils/formatDate";
+import { fmtDate, fmtTabName } from "../utils/formatDate";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -63,7 +63,7 @@ export default function WorkoutBrowser() {
               onClick={() => setSelectedTab(tab.tab_name)}
               className="w-full text-left px-4 py-3 bg-gray-900 rounded-xl text-gray-300 ring-1 ring-gray-800/60 transition-colors active:bg-gray-800 touch-target"
             >
-              {tab.tab_name}
+              {fmtTabName(tab.tab_name)}
             </button>
           ))}
           {reversedTabs.length === 0 && (
