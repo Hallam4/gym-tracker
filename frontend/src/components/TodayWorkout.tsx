@@ -151,7 +151,7 @@ export default function TodayWorkout() {
     totalSets += total;
     doneSets += done;
   }
-  const progressPct = totalSets > 0 ? (doneSets / totalSets) * 100 : 0;
+  const progressPct = totalSets > 0 ? Math.min(100, (doneSets / totalSets) * 100) : 0;
 
   // Build confirm summary
   const exerciseCount = session?.exercises.length ?? 0;

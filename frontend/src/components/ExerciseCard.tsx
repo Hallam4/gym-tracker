@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { Exercise } from "../api/gym";
 
+const MAX_SETS = 5;
+
 interface Props {
   exercise: Exercise;
   onSetComplete: (setIndex: number, reps: number) => void;
@@ -17,18 +19,21 @@ export default function ExerciseCard({
   className = "mb-3",
 }: Props) {
   const [localWeight, setLocalWeight] = useState(exercise.weight);
-  const [completedSets, setCompletedSets] = useState<(number | null)[]>(
-    exercise.set_results.map((s) => (s ? parseInt(s) || null : null))
-  );
+  const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
+    const parsed = exercise.set_results.map((s) => (s ? parseInt(s) || null : null));
+    while (parsed.length < MAX_SETS) parsed.push(null);
+    return parsed;
+  });
 
   const totalSets = parseInt(exercise.sets) || 3;
   const targetReps = parseInt(exercise.reps) || 10;
 
-  const doneCount = completedSets.filter((s) => s !== null).length;
+  const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
+  const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
 
   useEffect(() => {
-    onProgressChange?.(doneCount, totalSets);
-  }, [doneCount, totalSets, onProgressChange]);
+    onProgressChange?.(normalDone, totalSets);
+  }, [normalDone, totalSets, onProgressChange]);
 
   const adjustWeight = useCallback(
     (delta: number) => {
@@ -79,7 +84,10 @@ export default function ExerciseCard({
           </div>
         </div>
         <div className="text-sm text-gray-500">
-          {doneCount}/{totalSets}
+          {normalDone}/{totalSets}
+          {bonusDone > 0 && (
+            <span className="text-blue-400"> +{bonusDone}</span>
+          )}
         </div>
       </div>
 
@@ -105,23 +113,48 @@ export default function ExerciseCard({
 
       {/* Set buttons */}
       <div className="grid grid-cols-5 gap-2">
-        {Array.from({ length: totalSets }, (_, i) => {
+        {Array.from({ length: MAX_SETS }, (_, i) => {
+          const isBonus = i >= totalSets;
           const isDone = completedSets[i] !== null;
           const reps = completedSets[i];
+
+          let btnClass: string;
+          if (isDone) {
+            if (isBonus) {
+              btnClass = "bg-blue-800 text-blue-200";
+            } else if (reps! >= targetReps) {
+              btnClass = "bg-green-700 text-white";
+            } else {
+              btnClass = "bg-amber-700 text-white";
+            }
+          } else if (isBonus) {
+            btnClass = "bg-gray-800/50 text-gray-600 border border-dashed border-gray-700";
+          } else {
+            btnClass = "bg-gray-800 text-gray-400";
+          }
+
+          let label: React.ReactNode;
+          if (isDone) {
+            label = reps;
+          } else if (isBonus) {
+            label = "+";
+          } else {
+            label = `S${i + 1}`;
+          }
+
           return (
             <div key={i} className="text-center">
               <button
                 onClick={() => handleSetTap(i)}
-                className={`w-full h-12 rounded-lg font-bold text-lg touch-target ${
-                  isDone
-                    ? "bg-green-700 text-white"
-                    : "bg-gray-800 text-gray-400"
-                }`}
+                className={`w-full h-12 rounded-lg font-bold text-lg touch-target ${btnClass}`}
               >
-                {isDone ? reps : `S${i + 1}`}
+                {label}
               </button>
+              <div className="text-[10px] text-gray-600 mt-0.5">
+                /{targetReps}
+              </div>
               {isDone && (
-                <div className="flex justify-center gap-1 mt-1">
+                <div className="flex justify-center gap-1">
                   <button
                     onClick={() => handleRepsAdjust(i, -1)}
                     className="text-xs text-gray-500 px-1"
