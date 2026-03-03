@@ -10,6 +10,7 @@ function fmtTime(s: number) {
 interface Props {
   exercise: Exercise;
   timerSeconds: number;
+  lastGroupSetTime: number | null;
   onSetComplete: (setIndex: number, reps: number) => void;
   onWeightChange: (weight: string) => void;
   onNotesChange?: (notes: string) => void;
@@ -21,6 +22,7 @@ interface Props {
 export default function ExerciseCard({
   exercise,
   timerSeconds,
+  lastGroupSetTime,
   onSetComplete,
   onWeightChange,
   onNotesChange,
@@ -140,6 +142,11 @@ export default function ExerciseCard({
                   <span className="text-blue-400"> +{bonusDone}</span>
                 )}
               </div>
+              {lastGroupSetTime != null && (
+                <span className="shrink-0 text-[10px] font-mono text-gray-500">
+                  {fmtTime(lastGroupSetTime)}
+                </span>
+              )}
             </div>
             {!hideSetInfo && (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">

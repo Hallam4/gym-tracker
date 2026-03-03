@@ -40,6 +40,7 @@ export default function TodayWorkout() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [lastSetTime, setLastSetTime] = useState<number | null>(null);
+  const [groupLastSetTime, setGroupLastSetTime] = useState<Map<number, number>>(new Map());
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
@@ -120,6 +121,11 @@ export default function TodayWorkout() {
       const setCol = 5 + setIndex; // Set 1-5 are columns 5-9
       writeQueue.enqueue({ row: exercise.sheet_row, col: setCol, value: reps.toString() });
       setLastSetTime(timerSeconds);
+      setGroupLastSetTime((prev) => {
+        const next = new Map(prev);
+        next.set(exercise.superset_group, timerSeconds);
+        return next;
+      });
     },
     [session, writeQueue, timerSeconds]
   );
@@ -184,7 +190,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setSelectedType(t); }}
+            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSelectedType(t); }}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
@@ -215,7 +221,7 @@ export default function TodayWorkout() {
           </span>
         </button>
         <button
-          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); }}
+          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); setGroupLastSetTime(new Map()); }}
           className="text-gray-500 text-sm bg-gray-800/50 rounded-lg px-2 py-2 active:scale-90 transition-transform duration-150"
           title="Reset"
         >
@@ -261,6 +267,7 @@ export default function TodayWorkout() {
               key={`${session.tab_name}-${group.groupId}-${i}`}
               exercise={ex}
               timerSeconds={timerSeconds}
+              lastGroupSetTime={groupLastSetTime.get(ex.superset_group) ?? null}
               onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
               onWeightChange={(w) => handleWeightChange(ex, w)}
               onNotesChange={(notes) => handleNotesChange(ex, notes)}
