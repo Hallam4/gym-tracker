@@ -82,8 +82,8 @@ class PREntry(BaseModel):
     exercise: str
     best_weight: float
     best_weight_date: str
-    best_volume: float
-    best_volume_date: str
+    estimated_1rm: float
+    estimated_1rm_date: str
 
 
 class PRsResponse(BaseModel):

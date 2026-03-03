@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
-import RestTimer from "./RestTimer";
 import { groupExercises } from "../utils/groupExercises";
 import { useWriteQueue } from "../hooks/useWriteQueue";
 import Toast from "./Toast";
@@ -36,31 +35,24 @@ function savePendingWrites(writes: PendingWrite[]) {
 
 export default function TodayWorkout() {
   const [selectedType, setSelectedType] = useState<string>("U1");
-  const [workoutStart, setWorkoutStart] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [restTimer, setRestTimer] = useState<{
-    exerciseName: string;
-    durationSeconds: number;
-  } | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (workoutStart === null) {
-      setElapsed(0);
-      return;
-    }
+    if (!timerRunning) return;
     intervalRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - workoutStart) / 1000));
+      setTimerSeconds((s) => s + 1);
     }, 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [workoutStart]);
+  }, [timerRunning]);
 
   const { data: session, isLoading, error } = useQuery({
     queryKey: ["workout-type", selectedType],
@@ -126,10 +118,6 @@ export default function TodayWorkout() {
       if (!session) return;
       const setCol = 5 + setIndex; // Set 1-5 are columns 5-9
       writeQueue.enqueue({ row: exercise.sheet_row, col: setCol, value: reps.toString() });
-      const restSeconds = parseInt(exercise.rest_times[setIndex]) || 0;
-      if (restSeconds > 0) {
-        setRestTimer({ exerciseName: exercise.name, durationSeconds: restSeconds });
-      }
     },
     [session, writeQueue]
   );
@@ -194,7 +182,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setRestTimer(null); setSelectedType(t); setWorkoutStart(Date.now()); }}
+            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setSelectedType(t); }}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
@@ -211,12 +199,26 @@ export default function TodayWorkout() {
         <div className="text-sm text-gray-500">
           {session.day} {session.date && `— ${session.date}`}
         </div>
-        {workoutStart !== null && (
-          <div className="text-sm font-mono text-blue-400 bg-blue-950/50 px-2 py-0.5 rounded-md">
-            {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
-          </div>
-        )}
         <div className="text-xs text-gray-600">{session.tab_name}</div>
+      </div>
+
+      {/* Stopwatch */}
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <button
+          onClick={() => setTimerRunning((r) => !r)}
+          className="bg-gray-800/70 rounded-xl px-4 py-2 active:scale-95 transition-transform duration-150"
+        >
+          <span className="text-xl font-mono text-white tabular-nums">
+            {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
+          </span>
+        </button>
+        <button
+          onClick={() => { setTimerRunning(false); setTimerSeconds(0); }}
+          className="text-gray-500 text-sm bg-gray-800/50 rounded-lg px-2 py-2 active:scale-90 transition-transform duration-150"
+          title="Reset"
+        >
+          &#8634;
+        </button>
       </div>
 
       {/* Progress bar */}
@@ -236,20 +238,16 @@ export default function TodayWorkout() {
         </div>
       )}
 
-      {/* Rest timer */}
-      {restTimer && (
-        <RestTimer
-          exerciseName={restTimer.exerciseName}
-          durationSeconds={restTimer.durationSeconds}
-          onDismiss={() => setRestTimer(null)}
-        />
-      )}
-
       {/* Exercise cards */}
       {groupExercises(session.exercises).map((group) => (
         <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3 mb-3" : ""}>
           {group.isSuperset && (
-            <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold text-blue-400">Superset</span>
+              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                {group.exercises[0].sets} sets x {group.exercises[0].reps} reps
+              </span>
+            </div>
           )}
           {group.exercises.map((ex, i) => (
             <ExerciseCard
@@ -261,6 +259,7 @@ export default function TodayWorkout() {
               onProgressChange={(done, total) =>
                 handleProgressChange(`${group.groupId}-${i}`, done, total)
               }
+              hideSetInfo={group.isSuperset}
               className={group.isSuperset ? "mb-1" : "mb-3"}
             />
           ))}

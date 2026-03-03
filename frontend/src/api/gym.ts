@@ -52,8 +52,8 @@ export interface PREntry {
   exercise: string;
   best_weight: number;
   best_weight_date: string;
-  best_volume: number;
-  best_volume_date: string;
+  estimated_1rm: number;
+  estimated_1rm_date: string;
 }
 
 export interface PRsResponse {

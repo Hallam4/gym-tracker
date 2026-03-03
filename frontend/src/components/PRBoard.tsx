@@ -38,13 +38,13 @@ export default function PRBoard() {
       <div className="space-y-3">
         {prs.map((pr) => {
           const recentWeight = isRecent(pr.best_weight_date);
-          const recentVolume = isRecent(pr.best_volume_date);
+          const recent1rm = isRecent(pr.estimated_1rm_date);
 
           return (
             <div key={pr.exercise} className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium text-white">{pr.exercise}</span>
-                {(recentWeight || recentVolume) && (
+                {(recentWeight || recent1rm) && (
                   <span className="text-xs font-semibold bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-2 py-0.5 rounded-full animate-badge-bounce shadow-lg shadow-yellow-500/20">
                     NEW PR
                   </span>
@@ -59,11 +59,11 @@ export default function PRBoard() {
                   <div className="text-xs text-gray-600">{pr.best_weight_date}</div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-3">
-                  <div className="text-gray-500 mb-1">Best Volume</div>
-                  <div className={`text-lg font-bold ${recentVolume ? "text-yellow-400" : "text-white"}`}>
-                    {pr.best_volume.toFixed(0)} <span className="text-sm text-gray-500">kg</span>
+                  <div className="text-gray-500 mb-1">Est. 1RM</div>
+                  <div className={`text-lg font-bold ${recent1rm ? "text-yellow-400" : "text-white"}`}>
+                    {pr.estimated_1rm.toFixed(1)} <span className="text-sm text-gray-500">kg</span>
                   </div>
-                  <div className="text-xs text-gray-600">{pr.best_volume_date}</div>
+                  <div className="text-xs text-gray-600">{pr.estimated_1rm_date}</div>
                 </div>
               </div>
             </div>

@@ -9,6 +9,7 @@ interface Props {
   onWeightChange: (weight: string) => void;
   onNotesChange?: (notes: string) => void;
   onProgressChange?: (done: number, total: number) => void;
+  hideSetInfo?: boolean;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export default function ExerciseCard({
   onWeightChange,
   onNotesChange,
   onProgressChange,
+  hideSetInfo,
   className = "mb-3",
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -126,19 +128,21 @@ export default function ExerciseCard({
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                {exercise.sets} sets
-              </span>
-              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                {exercise.reps} reps
-              </span>
-              {exercise.target && (
-                <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                  Target {exercise.target} @ {localWeight}kg
+            {!hideSetInfo && (
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                  {exercise.sets} sets
                 </span>
-              )}
-            </div>
+                <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                  {exercise.reps} reps
+                </span>
+                {exercise.target && (
+                  <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
+                    Target {exercise.target} @ {localWeight}kg
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

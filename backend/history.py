@@ -149,8 +149,8 @@ def get_prs() -> list[PREntry]:
     for exercise, rows in by_exercise.items():
         best_weight = 0.0
         best_weight_date = ""
-        best_volume = 0.0
-        best_volume_date = ""
+        best_1rm = 0.0
+        best_1rm_date = ""
 
         for row in rows:
             w = _parse_weight(row.weight)
@@ -159,22 +159,26 @@ def get_prs() -> list[PREntry]:
                 for s in [row.set1, row.set2, row.set3, row.set4, row.set5]
                 if s
             ]
-            volume = w * sum(set_reps)
 
             if w > best_weight:
                 best_weight = w
                 best_weight_date = row.date
-            if volume > best_volume:
-                best_volume = volume
-                best_volume_date = row.date
+
+            # Epley 1RM per set: weight × (1 + reps / 30)
+            for reps in set_reps:
+                if reps > 0 and w > 0:
+                    e1rm = w * (1 + reps / 30)
+                    if e1rm > best_1rm:
+                        best_1rm = e1rm
+                        best_1rm_date = row.date
 
         prs.append(
             PREntry(
                 exercise=exercise,
                 best_weight=best_weight,
                 best_weight_date=best_weight_date,
-                best_volume=best_volume,
-                best_volume_date=best_volume_date,
+                estimated_1rm=round(best_1rm, 1),
+                estimated_1rm_date=best_1rm_date,
             )
         )
 
