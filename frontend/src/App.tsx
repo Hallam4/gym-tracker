@@ -18,8 +18,8 @@ export default function App() {
 
   return (
     <div className="max-w-lg mx-auto px-4 pb-20">
-      <header className="py-4 text-center">
-        <h1 className="text-xl font-bold text-white">Gym Tracker</h1>
+      <header className="py-5 text-center">
+        <h1 className="text-xl font-bold text-white tracking-tight">Gym Tracker</h1>
       </header>
 
       <main>
@@ -30,15 +30,16 @@ export default function App() {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800">
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-800/50">
         <div className="max-w-lg mx-auto flex">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 py-3 text-sm font-medium touch-target ${
+              data-active={tab === t.key}
+              className={`tab-btn flex-1 py-3 text-sm font-medium touch-target transition-colors duration-200 ${
                 tab === t.key
-                  ? "text-blue-400 border-t-2 border-blue-400"
+                  ? "text-blue-400"
                   : "text-gray-500"
               }`}
             >

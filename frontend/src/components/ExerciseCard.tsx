@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Exercise } from "../api/gym";
 
 const MAX_SETS = 5;
@@ -25,16 +25,25 @@ export default function ExerciseCard({
     while (parsed.length < MAX_SETS) parsed.push(null);
     return parsed;
   });
+  const [justCompleted, setJustCompleted] = useState<number | null>(null);
+  const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
   const targetReps = parseInt(exercise.target) || parseInt(exercise.reps) || 10;
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
+  const allDone = normalDone === totalSets;
 
   useEffect(() => {
     onProgressChange?.(normalDone, totalSets);
   }, [normalDone, totalSets, onProgressChange]);
+
+  useEffect(() => {
+    return () => {
+      if (popTimerRef.current) clearTimeout(popTimerRef.current);
+    };
+  }, []);
 
   const adjustWeight = useCallback(
     (delta: number) => {
@@ -52,9 +61,13 @@ export default function ExerciseCard({
       if (newSets[setIndex] !== null) {
         // Already done — toggle off
         newSets[setIndex] = null;
+        setJustCompleted(null);
       } else {
         newSets[setIndex] = targetReps;
         onSetComplete(setIndex, targetReps);
+        setJustCompleted(setIndex);
+        if (popTimerRef.current) clearTimeout(popTimerRef.current);
+        popTimerRef.current = setTimeout(() => setJustCompleted(null), 300);
       }
       setCompletedSets(newSets);
     },
@@ -74,14 +87,20 @@ export default function ExerciseCard({
   );
 
   return (
-    <div className={`bg-gray-900 rounded-lg p-4 ${className}`}>
+    <div className={`bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60 ${className}`}>
       {/* Exercise header */}
       <div
         className="flex items-center justify-between cursor-pointer select-none"
         onClick={() => setExpanded((e) => !e)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-gray-500 text-sm">{expanded ? "▾" : "▸"}</span>
+          <span
+            className={`text-gray-500 text-sm transition-transform duration-200 ${
+              expanded ? "rotate-90" : ""
+            }`}
+          >
+            ▸
+          </span>
           <div>
             <div className="font-medium text-white">{exercise.name}</div>
             <div className="text-sm text-gray-500">
@@ -92,7 +111,8 @@ export default function ExerciseCard({
             </div>
           </div>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className={`text-sm tabular-nums ${allDone ? "text-green-400" : "text-gray-500"}`}>
+          {allDone && <span className="mr-1">&#10003;</span>}
           {normalDone}/{totalSets}
           {bonusDone > 0 && (
             <span className="text-blue-400"> +{bonusDone}</span>
@@ -100,13 +120,18 @@ export default function ExerciseCard({
         </div>
       </div>
 
-      {expanded && (
-        <>
+      {/* Expand/collapse with CSS grid animation */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          expanded ? "grid-rows-expand" : "grid-rows-collapse"
+        }`}
+      >
+        <div className="grid-expand-inner">
           {/* Weight adjuster */}
           <div className="flex items-center justify-center gap-4 mb-4 mt-3">
             <button
               onClick={() => adjustWeight(-2.5)}
-              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center active:scale-90 transition-transform duration-150 ring-1 ring-gray-700/50"
             >
               -
             </button>
@@ -116,7 +141,7 @@ export default function ExerciseCard({
             </div>
             <button
               onClick={() => adjustWeight(2.5)}
-              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center"
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center active:scale-90 transition-transform duration-150 ring-1 ring-gray-700/50"
             >
               +
             </button>
@@ -157,7 +182,9 @@ export default function ExerciseCard({
                 <div key={i} className="text-center">
                   <button
                     onClick={() => handleSetTap(i)}
-                    className={`w-full h-12 rounded-lg font-bold text-lg touch-target ${btnClass}`}
+                    className={`set-btn w-full h-12 rounded-lg font-bold text-lg touch-target transition-colors duration-200 ${btnClass} ${
+                      justCompleted === i ? "animate-pop" : ""
+                    }`}
                   >
                     {label}
                   </button>
@@ -189,8 +216,8 @@ export default function ExerciseCard({
           {exercise.notes && (
             <div className="text-sm text-gray-500 mt-3 italic">{exercise.notes}</div>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

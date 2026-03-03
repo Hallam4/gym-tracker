@@ -162,6 +162,16 @@ export default function TodayWorkout() {
   }
   const progressPct = totalSets > 0 ? Math.min(100, (doneSets / totalSets) * 100) : 0;
 
+  // Progress bar color
+  let barColorClass: string;
+  if (progressPct >= 90) {
+    barColorClass = "bg-gradient-to-r from-green-500 to-emerald-400";
+  } else if (progressPct >= 50) {
+    barColorClass = "bg-gradient-to-r from-green-600 to-green-500";
+  } else {
+    barColorClass = "bg-green-600";
+  }
+
   // Build confirm summary
   const exerciseCount = session?.exercises.length ?? 0;
 
@@ -177,10 +187,10 @@ export default function TodayWorkout() {
           <button
             key={t}
             onClick={() => { writeQueue.flush(); setRestTimer(null); setSelectedType(t); setWorkoutStart(Date.now()); }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap touch-target ${
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
-                ? "bg-blue-600 text-white"
-                : "bg-gray-800 text-gray-400"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50"
             }`}
           >
             {TYPE_LABELS[t]}
@@ -194,7 +204,7 @@ export default function TodayWorkout() {
           {session.day} {session.date && `— ${session.date}`}
         </div>
         {workoutStart !== null && (
-          <div className="text-sm font-mono text-blue-400">
+          <div className="text-sm font-mono text-blue-400 bg-blue-950/50 px-2 py-0.5 rounded-md">
             {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
           </div>
         )}
@@ -204,13 +214,17 @@ export default function TodayWorkout() {
       {/* Progress bar */}
       {totalSets > 0 && (
         <div className="flex items-center gap-2 mb-4">
-          <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
+              className={`h-full rounded-full transition-all duration-500 ease-out ${barColorClass} ${
+                progressPct >= 90 ? "progress-glow" : ""
+              }`}
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <span className="text-xs text-gray-500 tabular-nums">{doneSets}/{totalSets}</span>
+          <span className={`text-xs tabular-nums ${progressPct >= 100 ? "text-green-400" : "text-gray-500"}`}>
+            {doneSets}/{totalSets}
+          </span>
         </div>
       )}
 
@@ -225,7 +239,7 @@ export default function TodayWorkout() {
 
       {/* Exercise cards */}
       {groupExercises(session.exercises).map((group) => (
-        <div key={group.groupId} className={group.isSuperset ? "border-l-4 border-blue-500 pl-3 mb-3" : ""}>
+        <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3 mb-3" : ""}>
           {group.isSuperset && (
             <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
           )}
@@ -248,7 +262,7 @@ export default function TodayWorkout() {
       <button
         onClick={() => setConfirmVisible(true)}
         disabled={completeMutation.isPending}
-        className="w-full mt-4 py-4 bg-green-700 text-white rounded-lg font-bold text-lg touch-target disabled:opacity-50"
+        className="w-full mt-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-bold text-lg touch-target disabled:opacity-50 shadow-lg shadow-green-700/25 active:scale-[0.98] transition-all duration-200"
       >
         {completeMutation.isPending
           ? "Saving..."

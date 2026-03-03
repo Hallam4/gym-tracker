@@ -42,10 +42,10 @@ export default function WorkoutBrowser() {
               setSelectedType(t);
               setSelectedTab(null);
             }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap touch-target ${
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 ${
               selectedType === t
-                ? "bg-blue-600 text-white"
-                : "bg-gray-800 text-gray-400"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50"
             }`}
           >
             {TYPE_LABELS[t]}
@@ -60,7 +60,7 @@ export default function WorkoutBrowser() {
             <button
               key={tab.tab_name}
               onClick={() => setSelectedTab(tab.tab_name)}
-              className="w-full text-left px-4 py-3 bg-gray-900 rounded-lg text-gray-300 hover:bg-gray-800 touch-target"
+              className="w-full text-left px-4 py-3 bg-gray-900 rounded-xl text-gray-300 ring-1 ring-gray-800/60 transition-colors active:bg-gray-800 touch-target"
             >
               {tab.tab_name}
             </button>
@@ -73,7 +73,7 @@ export default function WorkoutBrowser() {
         <div>
           <button
             onClick={() => setSelectedTab(null)}
-            className="text-sm text-blue-400 mb-4"
+            className="text-sm text-blue-400 mb-4 hover:text-blue-300 transition-colors"
           >
             &larr; Back to list
           </button>
@@ -100,12 +100,12 @@ function WorkoutDetail({ session }: { session: WorkoutSession }) {
 
       <div className="space-y-3">
         {groupExercises(session.exercises).map((group) => (
-          <div key={group.groupId} className={group.isSuperset ? "border-l-4 border-blue-500 pl-3" : ""}>
+          <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3" : ""}>
             {group.isSuperset && (
               <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
             )}
             {group.exercises.map((ex, i) => (
-              <div key={i} className={`bg-gray-900 rounded-lg p-4 ${group.isSuperset ? "mb-1" : "mb-3"}`}>
+              <div key={i} className={`bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60 ${group.isSuperset ? "mb-1" : "mb-3"}`}>
                 <div className="font-medium text-white mb-2">{ex.name}</div>
                 <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
                   <div>
@@ -130,7 +130,7 @@ function WorkoutDetail({ session }: { session: WorkoutSession }) {
                         s && (
                           <span
                             key={j}
-                            className="bg-gray-800 px-2 py-1 rounded text-gray-300"
+                            className="bg-gray-800 px-2 py-1 rounded-md text-gray-300 tabular-nums"
                           >
                             S{j + 1}: {s}
                           </span>

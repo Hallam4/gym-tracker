@@ -41,27 +41,27 @@ export default function PRBoard() {
           const recentVolume = isRecent(pr.best_volume_date);
 
           return (
-            <div key={pr.exercise} className="bg-gray-900 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
+            <div key={pr.exercise} className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+              <div className="flex items-center justify-between mb-3">
                 <span className="font-medium text-white">{pr.exercise}</span>
                 {(recentWeight || recentVolume) && (
-                  <span className="text-xs bg-yellow-600 text-yellow-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-2 py-0.5 rounded-full animate-badge-bounce shadow-lg shadow-yellow-500/20">
                     NEW PR
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-500">Best Weight</div>
-                  <div className={`font-bold ${recentWeight ? "text-yellow-400" : "text-white"}`}>
-                    {pr.best_weight} kg
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-800/50 rounded-lg p-3">
+                  <div className="text-gray-500 mb-1">Best Weight</div>
+                  <div className={`text-lg font-bold ${recentWeight ? "text-yellow-400" : "text-white"}`}>
+                    {pr.best_weight} <span className="text-sm text-gray-500">kg</span>
                   </div>
                   <div className="text-xs text-gray-600">{pr.best_weight_date}</div>
                 </div>
-                <div>
-                  <div className="text-gray-500">Best Volume</div>
-                  <div className={`font-bold ${recentVolume ? "text-yellow-400" : "text-white"}`}>
-                    {pr.best_volume.toFixed(0)} kg
+                <div className="bg-gray-800/50 rounded-lg p-3">
+                  <div className="text-gray-500 mb-1">Best Volume</div>
+                  <div className={`text-lg font-bold ${recentVolume ? "text-yellow-400" : "text-white"}`}>
+                    {pr.best_volume.toFixed(0)} <span className="text-sm text-gray-500">kg</span>
                   </div>
                   <div className="text-xs text-gray-600">{pr.best_volume_date}</div>
                 </div>
