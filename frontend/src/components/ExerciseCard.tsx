@@ -93,30 +93,43 @@ export default function ExerciseCard({
         className="flex items-center justify-between cursor-pointer select-none"
         onClick={() => setExpanded((e) => !e)}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`text-gray-500 text-sm transition-transform duration-200 ${
+            className={`text-gray-500 text-sm transition-transform duration-200 shrink-0 ${
               expanded ? "rotate-90" : ""
             }`}
           >
             ▸
           </span>
-          <div>
-            <div className="font-medium text-white">{exercise.name}</div>
-            <div className="text-sm text-gray-500">
-              {exercise.sets} Sets, {exercise.reps} Reps
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-white truncate">{exercise.name}</span>
+              <div className={`shrink-0 text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
+                allDone
+                  ? "bg-green-900/50 text-green-400"
+                  : "bg-gray-800/70 text-gray-500"
+              }`}>
+                {allDone && <span className="mr-0.5">&#10003;</span>}
+                {normalDone}/{totalSets}
+                {bonusDone > 0 && (
+                  <span className="text-blue-400"> +{bonusDone}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                {exercise.sets} sets
+              </span>
+              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                {exercise.reps} reps
+              </span>
               {exercise.target && (
-                <span className="text-blue-400">, Target {exercise.target}</span>
+                <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
+                  Target {exercise.target}
+                </span>
               )}
             </div>
           </div>
-        </div>
-        <div className={`text-sm tabular-nums ${allDone ? "text-green-400" : "text-gray-500"}`}>
-          {allDone && <span className="mr-1">&#10003;</span>}
-          {normalDone}/{totalSets}
-          {bonusDone > 0 && (
-            <span className="text-blue-400"> +{bonusDone}</span>
-          )}
         </div>
       </div>
 
