@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, WorkoutSession } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
+import RestTimer from "./RestTimer";
 import { groupExercises } from "../utils/groupExercises";
+import { useWriteQueue } from "../hooks/useWriteQueue";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 
@@ -38,6 +40,10 @@ export default function TodayWorkout() {
   const [elapsed, setElapsed] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [restTimer, setRestTimer] = useState<{
+    exerciseName: string;
+    durationSeconds: number;
+  } | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
@@ -69,14 +75,19 @@ export default function TodayWorkout() {
   const logMutation = useMutation({
     mutationFn: (vars: { tabName: string; updates: { row: number; col: number; value: string }[] }) =>
       api.logWorkout(vars.tabName, vars.updates),
-    onSuccess: () => {
-      setToast({ message: "Set logged", type: "success" });
-    },
     onError: (_err, vars) => {
       const pending = loadPendingWrites();
       pending.push(vars);
       savePendingWrites(pending);
       setToast({ message: "Save failed — will retry", type: "error" });
+    },
+  });
+
+  const writeQueue = useWriteQueue({
+    debounceMs: 800,
+    onFlush: (updates) => {
+      if (!session) return;
+      return logMutation.mutateAsync({ tabName: session.tab_name, updates });
     },
   });
 
@@ -114,23 +125,21 @@ export default function TodayWorkout() {
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
       if (!session) return;
       const setCol = 5 + setIndex; // Set 1-5 are columns 5-9
-      logMutation.mutate({
-        tabName: session.tab_name,
-        updates: [{ row: exercise.sheet_row, col: setCol, value: reps.toString() }],
-      });
+      writeQueue.enqueue({ row: exercise.sheet_row, col: setCol, value: reps.toString() });
+      const restSeconds = parseInt(exercise.rest_times[setIndex]) || 0;
+      if (restSeconds > 0) {
+        setRestTimer({ exerciseName: exercise.name, durationSeconds: restSeconds });
+      }
     },
-    [session, logMutation]
+    [session, writeQueue]
   );
 
   const handleWeightChange = useCallback(
     (exercise: WorkoutSession["exercises"][0], weight: string) => {
       if (!session) return;
-      logMutation.mutate({
-        tabName: session.tab_name,
-        updates: [{ row: exercise.sheet_row, col: 3, value: weight }],
-      });
+      writeQueue.enqueue({ row: exercise.sheet_row, col: 3, value: weight });
     },
-    [session, logMutation]
+    [session, writeQueue]
   );
 
   const handleProgressChange = useCallback(
@@ -167,7 +176,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { setSelectedType(t); setWorkoutStart(Date.now()); }}
+            onClick={() => { writeQueue.flush(); setRestTimer(null); setSelectedType(t); setWorkoutStart(Date.now()); }}
             className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap touch-target ${
               selectedType === t
                 ? "bg-blue-600 text-white"
@@ -203,6 +212,15 @@ export default function TodayWorkout() {
           </div>
           <span className="text-xs text-gray-500 tabular-nums">{doneSets}/{totalSets}</span>
         </div>
+      )}
+
+      {/* Rest timer */}
+      {restTimer && (
+        <RestTimer
+          exerciseName={restTimer.exerciseName}
+          durationSeconds={restTimer.durationSeconds}
+          onDismiss={() => setRestTimer(null)}
+        />
       )}
 
       {/* Exercise cards */}
@@ -245,8 +263,9 @@ export default function TodayWorkout() {
           title="Complete workout?"
           summary={`${exerciseCount} exercises, ${doneSets}/${totalSets} sets completed`}
           onCancel={() => setConfirmVisible(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setConfirmVisible(false);
+            await writeQueue.flush();
             completeMutation.mutate(session.tab_name);
           }}
         />
