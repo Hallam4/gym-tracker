@@ -232,7 +232,6 @@ export default function TodayWorkout() {
         <div className="text-sm text-gray-400">
           {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
         </div>
-        <div className="text-xs text-gray-400">{session.tab_name}</div>
       </div>
 
       {/* Stopwatch */}
