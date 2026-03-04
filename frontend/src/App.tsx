@@ -206,6 +206,10 @@ export default function App() {
                 );
               })}
             </div>
+            <p className="text-gray-500 text-xs text-center mt-4">
+              v{__APP_VERSION__} · Built {new Date(__BUILD_TIME__).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })},{" "}
+              {new Date(__BUILD_TIME__).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+            </p>
             <button
               onClick={() => { setShowSettings(false); settingsTriggerRef.current?.focus(); }}
               className="mt-6 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold touch-target hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
