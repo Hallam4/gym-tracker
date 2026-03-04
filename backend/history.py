@@ -30,10 +30,20 @@ def _ensure_history_tab():
 def append_workout(day: str, exercises: list[Exercise], workout_date: str | None = None):
     """Append completed exercises to the History tab."""
     today = workout_date or date.today().isoformat()
+
+    # Build set of existing (date, exercise) pairs to prevent duplicates
+    existing = get_all_history()
+    existing_keys: set[tuple[str, str]] = set()
+    for row in existing:
+        existing_keys.add((row.date, row.exercise))
+
     rows = []
     for ex in exercises:
         # Only log exercises that have at least one set recorded
         if not any(s for s in ex.set_results if s):
+            continue
+        # Skip if already logged for this date + exercise
+        if (today, ex.name) in existing_keys:
             continue
         row = [
             today,
@@ -280,33 +290,37 @@ def get_streak_data() -> StreakData:
         iso = d.isocalendar()
         weeks_with_workouts.add((iso[0], iso[1]))
 
-    # Walk backwards from current week
+    # Current streak: walk backwards from current week, count consecutive weeks
     current_streak = 0
-    best_streak = 0
-    streak = 0
     check = today
-    # Start from current week
     while True:
         iso = check.isocalendar()
         if (iso[0], iso[1]) in weeks_with_workouts:
-            streak += 1
-            best_streak = max(best_streak, streak)
+            current_streak += 1
         else:
-            if streak > 0 and current_streak == 0:
-                current_streak = streak
-            streak = 0
-        # Go to previous week
-        check = check - timedelta(weeks=1)
-        # Stop if we've gone past all history
-        if date_objects and check < date_objects[0] - timedelta(weeks=1):
             break
-        if not date_objects:
+        check = check - timedelta(weeks=1)
+        if not date_objects or check < date_objects[0] - timedelta(weeks=1):
             break
 
-    # If we never broke the streak, current = streak
-    if current_streak == 0:
-        current_streak = streak
-    best_streak = max(best_streak, streak)
+    # Best streak: scan all weeks chronologically
+    best_streak = 0
+    if date_objects:
+        all_weeks = sorted(weeks_with_workouts)
+        streak = 1
+        for i in range(1, len(all_weeks)):
+            prev_year, prev_week = all_weeks[i - 1]
+            curr_year, curr_week = all_weeks[i]
+            # Check if consecutive: same year and week+1, or year boundary
+            prev_date = date.fromisocalendar(prev_year, prev_week, 1)
+            curr_date = date.fromisocalendar(curr_year, curr_week, 1)
+            if (curr_date - prev_date).days == 7:
+                streak += 1
+            else:
+                best_streak = max(best_streak, streak)
+                streak = 1
+        best_streak = max(best_streak, streak)
+    best_streak = max(best_streak, current_streak)
 
     return StreakData(
         current_streak=current_streak,

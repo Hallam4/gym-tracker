@@ -20,7 +20,7 @@ from models import (
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Gym Tracker API")
+app = FastAPI(title="Gym Tracker API", docs_url=None, redoc_url=None)
 
 
 def _safe_error(e: Exception) -> str:
@@ -34,7 +34,7 @@ def _safe_error(e: Exception) -> str:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://gym-tracker-frontend-uhu5.onrender.com"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -128,7 +128,7 @@ async def get_workout_by_tab(tab_name: str):
 async def log_workout(tab_name: str, req: LogWorkoutRequest):
     """Write cell updates to a specific tab."""
     try:
-        sheets_client.write_cells(tab_name, req.updates)
+        sheets_client.write_cells(tab_name, [u.model_dump() for u in req.updates])
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e))
     return {"status": "ok"}

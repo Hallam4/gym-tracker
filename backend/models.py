@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Exercise(BaseModel):
@@ -44,8 +44,14 @@ class LogSetRequest(BaseModel):
     weight: float | None = None
 
 
+class CellUpdate(BaseModel):
+    row: int = Field(ge=0, le=1000)
+    col: int = Field(ge=0, le=50)
+    value: str = Field(max_length=500)
+
+
 class LogWorkoutRequest(BaseModel):
-    updates: list[dict]  # [{sheet_row, column, value}]
+    updates: list[CellUpdate]
 
 
 class HistoryRow(BaseModel):
