@@ -54,63 +54,80 @@ export default function ProgressCharts() {
   const chartData = progress?.history ?? [];
 
   return (
-    <div>
-      <h2 className="text-lg font-bold text-white mb-4">Progress</h2>
+    <div className="space-y-6">
+      <h2 className="text-lg font-bold text-white">Progress</h2>
 
       <StreakDashboard />
 
       {/* Exercise search */}
-      <input
-        type="text"
-        placeholder="Search exercise..."
-        value={searchInput}
-        onChange={(e) => setSearchInput(e.target.value)}
-        className="w-full bg-gray-900 text-white rounded-xl px-4 py-3 mb-3 ring-1 ring-gray-800 focus:ring-blue-500/70 focus:outline-none touch-target transition-shadow placeholder:text-gray-600"
-      />
+      <div className="space-y-3">
+        <label htmlFor="exercise-search" className="sr-only">Search exercise</label>
+        <input
+          id="exercise-search"
+          type="text"
+          placeholder="Search exercise..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-full bg-gray-900 text-white rounded-2xl px-4 py-3 ring-1 ring-gray-800 focus-visible:ring-blue-500/70 focus-visible:outline-none touch-target transition-shadow placeholder:text-gray-500"
+          role="combobox"
+          aria-expanded={!exercise && filteredExercises.length > 0}
+          aria-controls="exercise-listbox"
+          aria-autocomplete="list"
+        />
 
-      {/* Exercise list */}
-      {!exercise && (
-        <div className="space-y-1 mb-4 max-h-60 overflow-y-auto">
-          {filteredExercises.map((name) => (
-            <button
-              key={name}
-              onClick={() => {
-                setExercise(name);
-                setSearchInput(name);
-              }}
-              className="w-full text-left px-4 py-3 rounded-lg bg-gray-900 text-gray-300 hover:bg-gray-800 text-sm touch-target transition-colors"
-            >
-              {name}
-            </button>
+        {/* Exercise list */}
+        {!exercise && (
+          <div id="exercise-listbox" role="listbox" aria-label="Exercise options" className="space-y-1.5 max-h-60 overflow-y-auto">
+            {filteredExercises.map((name) => (
+              <button
+                key={name}
+                role="option"
+                aria-selected={false}
+                onClick={() => {
+                  setExercise(name);
+                  setSearchInput(name);
+                }}
+                className="w-full text-left px-4 py-3 rounded-xl bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 hover:bg-gray-800 active:bg-gray-700 active:scale-[0.99] text-sm touch-target transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {exercise && (
+          <button
+            onClick={() => {
+              setExercise("");
+              setSearchInput("");
+            }}
+            className="text-sm text-blue-400 hover:text-blue-300 active:text-blue-200 transition-colors duration-150 min-h-[44px] inline-flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+          >
+            &larr; Back to exercise list
+          </button>
+        )}
+      </div>
+
+      {isLoading && (
+        <div className="space-y-4" role="status" aria-label="Loading progress charts">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
+              <div className="h-4 w-32 bg-gray-800 rounded animate-pulse mb-3" />
+              <div className="h-[200px] bg-gray-800/50 rounded-lg animate-pulse" />
+            </div>
           ))}
         </div>
       )}
 
-      {exercise && (
-        <button
-          onClick={() => {
-            setExercise("");
-            setSearchInput("");
-          }}
-          className="text-sm text-blue-400 mb-4 hover:text-blue-300 transition-colors"
-        >
-          &larr; Back to exercise list
-        </button>
-      )}
-
-      {isLoading && (
-        <div className="text-center py-8 text-gray-400">Loading...</div>
-      )}
-
       {exercise && chartData.length > 0 && (
-        <div className="space-y-4">
+        <section aria-label={`Progress charts for ${exercise}`} className="space-y-4">
           {/* Weight over time */}
-          <div className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+          <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
               Weight Over Time
             </h3>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={chartData}>
+              <ComposedChart data={chartData} aria-label="Weight over time chart">
                 <defs>
                   <linearGradient id="gradWeight" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -121,10 +138,10 @@ export default function ProgressCharts() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={fmtDate}
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area
                   type="monotone"
@@ -145,12 +162,12 @@ export default function ProgressCharts() {
           </div>
 
           {/* Volume over time */}
-          <div className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+          <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
               Volume Over Time
             </h3>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={chartData}>
+              <ComposedChart data={chartData} aria-label="Volume over time chart">
                 <defs>
                   <linearGradient id="gradVolume" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
@@ -161,10 +178,10 @@ export default function ProgressCharts() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={fmtDate}
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area
                   type="monotone"
@@ -185,12 +202,12 @@ export default function ProgressCharts() {
           </div>
 
           {/* Best reps over time */}
-          <div className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+          <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
               Best Reps Over Time
             </h3>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={chartData}>
+              <ComposedChart data={chartData} aria-label="Best reps over time chart">
                 <defs>
                   <linearGradient id="gradReps" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.3} />
@@ -201,10 +218,10 @@ export default function ProgressCharts() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={fmtDate}
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area
                   type="monotone"
@@ -225,12 +242,12 @@ export default function ProgressCharts() {
           </div>
 
           {/* Estimated 1RM over time */}
-          <div className="bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60">
+          <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
               Est. 1RM Over Time
             </h3>
             <ResponsiveContainer width="100%" height={200}>
-              <ComposedChart data={chartData}>
+              <ComposedChart data={chartData} aria-label="Estimated one rep max over time chart">
                 <defs>
                   <linearGradient id="gradE1RM" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#a855f7" stopOpacity={0.3} />
@@ -241,10 +258,10 @@ export default function ProgressCharts() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={fmtDate}
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area
                   type="monotone"
@@ -263,7 +280,7 @@ export default function ProgressCharts() {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </section>
       )}
 
       {exercise && chartData.length === 0 && !isLoading && (

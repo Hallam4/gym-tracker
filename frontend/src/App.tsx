@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import TodayWorkout from "./components/TodayWorkout";
 import WorkoutBrowser from "./components/WorkoutBrowser";
 import ProgressCharts from "./components/ProgressCharts";
@@ -50,6 +50,45 @@ export default function App() {
     }
   }, []);
 
+  const settingsModalRef = useRef<HTMLDivElement>(null);
+  const settingsTriggerRef = useRef<HTMLHeadingElement>(null);
+
+  // Focus trap for settings modal
+  useEffect(() => {
+    if (!showSettings) return;
+    const modal = settingsModalRef.current;
+    if (!modal) return;
+
+    const focusableEls = modal.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstEl = focusableEls[0];
+    const lastEl = focusableEls[focusableEls.length - 1];
+    firstEl?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSettings(false);
+        settingsTriggerRef.current?.focus();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl?.focus();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showSettings]);
+
   const visibleTabs = TABS.filter((t) => !hiddenTabs.has(t.key));
 
   const toggleTab = (key: string) => {
@@ -68,9 +107,10 @@ export default function App() {
   };
 
   return (
-    <div className="max-w-lg mx-auto px-4 pb-20">
-      <header className="py-5 text-center">
+    <div className="max-w-lg mx-auto px-4 pb-24">
+      <header className="py-4 flex items-center justify-center relative">
         <h1
+          ref={settingsTriggerRef}
           className="text-xl font-bold text-white tracking-tight select-none"
           onTouchStart={(e) => { e.preventDefault(); handlePressStart(); }}
           onTouchEnd={handlePressEnd}
@@ -81,9 +121,23 @@ export default function App() {
         >
           Gym Tracker
         </h1>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="absolute right-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-300 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+          aria-label="Settings"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </header>
 
-      <main>
+      <main
+        role="tabpanel"
+        id={`tabpanel-${tab}`}
+        aria-labelledby={`tab-${tab}`}
+      >
         {tab === "home" && <HomeDashboard onNavigate={setTab} />}
         {tab === "today" && <TodayWorkout />}
         {tab === "browse" && <WorkoutBrowser />}
@@ -92,17 +146,21 @@ export default function App() {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-800/50">
-        <div className="max-w-lg mx-auto flex">
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-gray-800/50" aria-label="Main navigation">
+        <div className="max-w-lg mx-auto flex" role="tablist" aria-label="App sections">
           {visibleTabs.map((t) => (
             <button
               key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              aria-controls={`tabpanel-${t.key}`}
+              id={`tab-${t.key}`}
               onClick={() => setTab(t.key)}
               data-active={tab === t.key}
-              className={`tab-btn flex-1 py-3 text-sm font-medium touch-target transition-colors duration-200 ${
+              className={`tab-btn flex-1 py-3 text-sm font-medium touch-target transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset ${
                 tab === t.key
                   ? "text-blue-400"
-                  : "text-gray-500"
+                  : "text-gray-400 hover:text-gray-300"
               }`}
             >
               {t.label}
@@ -113,19 +171,29 @@ export default function App() {
 
       {/* Settings modal */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-title"
+          ref={settingsModalRef}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowSettings(false); settingsTriggerRef.current?.focus(); } }}
+        >
           <div className="bg-gray-900 rounded-2xl p-6 w-[85%] max-w-sm ring-1 ring-gray-800/60 animate-modal-in">
-            <h2 className="text-lg font-bold text-white mb-4">Visible Tabs</h2>
+            <h2 id="settings-title" className="text-lg font-bold text-white mb-4">Visible Tabs</h2>
             <div className="space-y-3">
               {TABS.filter((t) => t.key !== "home").map((t) => {
                 const isHidden = hiddenTabs.has(t.key);
                 return (
-                  <div key={t.key} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-300">{t.label}</span>
+                  <div key={t.key} className="flex items-center justify-between min-h-[44px]">
+                    <span id={`toggle-label-${t.key}`} className="text-sm text-gray-300">{t.label}</span>
                     <button
+                      role="switch"
+                      aria-checked={!isHidden}
+                      aria-labelledby={`toggle-label-${t.key}`}
                       onClick={() => toggleTab(t.key)}
-                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                        isHidden ? "bg-gray-700" : "bg-blue-600"
+                      className={`relative w-11 h-7 rounded-full transition-colors duration-200 touch-target active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
+                        isHidden ? "bg-gray-700 hover:bg-gray-600" : "bg-blue-600 hover:bg-blue-500"
                       }`}
                     >
                       <span
@@ -139,8 +207,8 @@ export default function App() {
               })}
             </div>
             <button
-              onClick={() => setShowSettings(false)}
-              className="mt-6 w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold"
+              onClick={() => { setShowSettings(false); settingsTriggerRef.current?.focus(); }}
+              className="mt-6 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold touch-target hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
             >
               Done
             </button>

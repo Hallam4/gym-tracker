@@ -123,19 +123,23 @@ export default function ExerciseCard({
   );
 
   return (
-    <div className={`bg-gray-900 rounded-xl p-4 ring-1 ring-gray-800/60 ${className}`}>
+    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 ${className}`}>
       {/* Exercise header */}
-      <div
-        className="flex items-center justify-between cursor-pointer select-none"
+      <button
+        type="button"
+        className="flex items-center justify-between w-full cursor-pointer select-none text-left min-h-[44px] active:opacity-80 transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
         onClick={toggleExpand}
+        aria-expanded={isExpanded}
+        aria-controls={`exercise-details-${exercise.sheet_row}`}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`text-gray-500 text-sm transition-transform duration-200 shrink-0 ${
+            className={`text-gray-400 text-sm transition-transform duration-200 shrink-0 ${
               isExpanded ? "rotate-90" : ""
             }`}
+            aria-hidden="true"
           >
-            ▸
+            &#9656;
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -143,70 +147,75 @@ export default function ExerciseCard({
               <div className={`shrink-0 text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
                 allDone
                   ? "bg-green-900/50 text-green-400"
-                  : "bg-gray-800/70 text-gray-500"
+                  : "bg-gray-800/70 text-gray-400"
               }`}>
-                {allDone && <span className="mr-0.5">&#10003;</span>}
-                {normalDone}/{totalSets}
-                {bonusDone > 0 && (
-                  <span className="text-blue-400"> +{bonusDone}</span>
-                )}
+                {allDone && <span className="mr-0.5" aria-hidden="true">&#10003;</span>}
+                <span className="sr-only">{normalDone} of {totalSets} sets completed{bonusDone > 0 ? `, plus ${bonusDone} bonus` : ""}</span>
+                <span aria-hidden="true">
+                  {normalDone}/{totalSets}
+                  {bonusDone > 0 && (
+                    <span className="text-blue-400"> +{bonusDone}</span>
+                  )}
+                </span>
               </div>
               {lastGroupSetTime != null && (
-                <span className="shrink-0 text-[10px] font-mono text-gray-500">
+                <span className="shrink-0 text-[10px] font-mono text-gray-400" aria-label={`Last set at ${fmtTime(lastGroupSetTime)}`}>
                   {fmtTime(lastGroupSetTime)}
                 </span>
               )}
             </div>
-            {(
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                {!hideSetInfo && (
-                  <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                    {exercise.sets} sets
-                  </span>
-                )}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {!hideSetInfo && (
                 <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
-                  {exercise.reps} reps
+                  {exercise.sets} sets
                 </span>
-                {exercise.target && (
-                  <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                    Target {exercise.target} @ {localWeight}kg
-                  </span>
-                )}
-              </div>
-            )}
+              )}
+              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                {exercise.reps} reps
+              </span>
+              {exercise.target && (
+                <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
+                  Target {exercise.target} @ {localWeight}kg
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Expand/collapse with CSS grid animation */}
       <div
+        id={`exercise-details-${exercise.sheet_row}`}
         className={`grid transition-[grid-template-rows] duration-300 ease-out ${
           isExpanded ? "grid-rows-expand" : "grid-rows-collapse"
         }`}
       >
         <div className="grid-expand-inner">
           {/* Weight adjuster */}
-          <div className="flex items-center justify-center gap-4 mb-4 mt-3">
+          <fieldset className="flex items-center justify-center gap-4 mb-4 mt-3 border-0 p-0 m-0">
+            <legend className="sr-only">Weight for {exercise.name}</legend>
             <button
               onClick={() => adjustWeight(-2.5)}
-              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center active:scale-90 transition-transform duration-150 ring-1 ring-gray-700/50"
+              aria-label={`Decrease weight by 2.5kg for ${exercise.name}`}
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center hover:bg-gray-700 active:scale-90 transition-all duration-150 ring-1 ring-gray-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               -
             </button>
-            <div className="text-center">
+            <div className="text-center" aria-live="polite">
               <div className="text-2xl font-bold text-white">{localWeight}</div>
-              <div className="text-xs text-gray-500">kg</div>
+              <div className="text-xs text-gray-400">kg</div>
             </div>
             <button
               onClick={() => adjustWeight(2.5)}
-              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center active:scale-90 transition-transform duration-150 ring-1 ring-gray-700/50"
+              aria-label={`Increase weight by 2.5kg for ${exercise.name}`}
+              className="w-12 h-12 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center hover:bg-gray-700 active:scale-90 transition-all duration-150 ring-1 ring-gray-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               +
             </button>
-          </div>
+          </fieldset>
 
           {/* Set buttons */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 gap-2.5" role="group" aria-label={`Sets for ${exercise.name}`}>
             {Array.from({ length: MAX_SETS }, (_, i) => {
               const isBonus = i >= totalSets;
               const isDone = completedSets[i] !== null;
@@ -222,7 +231,7 @@ export default function ExerciseCard({
                   btnClass = "bg-amber-700 text-white";
                 }
               } else if (isBonus) {
-                btnClass = "bg-gray-800/50 text-gray-600 border border-dashed border-gray-700";
+                btnClass = "bg-gray-800/50 text-gray-500 border border-dashed border-gray-700";
               } else {
                 btnClass = "bg-gray-800 text-gray-400";
               }
@@ -236,32 +245,41 @@ export default function ExerciseCard({
                 label = `S${i + 1}`;
               }
 
+              const ariaLabel = isDone
+                ? `Set ${i + 1}: ${reps} reps completed. Tap to undo.`
+                : isBonus
+                  ? `Bonus set ${i + 1 - totalSets}. Tap to log.`
+                  : `Set ${i + 1}. Tap to log ${targetReps} reps.`;
+
               return (
                 <div key={i} className="text-center">
                   <button
                     onClick={() => handleSetTap(i)}
-                    className={`set-btn w-full h-12 rounded-lg font-bold text-lg touch-target transition-colors duration-200 ${btnClass} ${
+                    aria-label={ariaLabel}
+                    className={`set-btn w-full h-12 rounded-lg font-bold text-lg touch-target transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${btnClass} ${
                       justCompleted === i ? "animate-pop" : ""
                     }`}
                   >
                     {label}
                   </button>
                   {isDone && setTimes[i] != null && (
-                    <div className="text-[10px] font-mono text-gray-500 mt-0.5">
+                    <div className="text-[10px] font-mono text-gray-400 mt-0.5" aria-hidden="true">
                       {fmtTime(setTimes[i]!)}
                     </div>
                   )}
                   {isDone && (
-                    <div className="flex justify-center gap-1">
+                    <div className="flex justify-center gap-1 mt-0.5">
                       <button
                         onClick={() => handleRepsAdjust(i, -1)}
-                        className="text-xs text-gray-500 px-1"
+                        aria-label={`Decrease reps for set ${i + 1}`}
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-400 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         -
                       </button>
                       <button
                         onClick={() => handleRepsAdjust(i, 1)}
-                        className="text-xs text-gray-500 px-1"
+                        aria-label={`Increase reps for set ${i + 1}`}
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-400 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         +
                       </button>
@@ -272,14 +290,18 @@ export default function ExerciseCard({
             })}
           </div>
 
-          {/* Notes — editable textarea */}
+          {/* Notes -- editable textarea */}
+          <label className="sr-only" htmlFor={`notes-${exercise.sheet_row}`}>
+            Notes for {exercise.name}
+          </label>
           <textarea
+            id={`notes-${exercise.sheet_row}`}
             value={localNotes}
             onChange={(e) => handleNotesChange(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             placeholder="Notes..."
             rows={1}
-            className="w-full mt-3 bg-gray-800/50 text-sm text-gray-300 placeholder:text-gray-600 rounded-lg px-3 py-2 resize-y min-h-[36px] max-h-32 ring-1 ring-gray-700/50 focus:ring-blue-500/70 focus:outline-none transition-shadow"
+            className="w-full mt-3 bg-gray-800/50 text-sm text-gray-300 placeholder:text-gray-500 rounded-lg px-3 py-2.5 resize-y min-h-[44px] max-h-32 ring-1 ring-gray-700/50 focus-visible:ring-blue-500/70 focus-visible:outline-none transition-shadow duration-200"
           />
         </div>
       </div>
