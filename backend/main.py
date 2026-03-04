@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +18,19 @@ from models import (
     StreakResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Gym Tracker API")
+
+
+def _safe_error(e: Exception) -> str:
+    """Return a sanitized error message, stripping API keys and internal details."""
+    msg = str(e)
+    # Google API errors contain ?key=... in URLs
+    if "key=" in msg or "spreadsheetId" in msg.lower() or "googleapis" in msg:
+        logger.error("Google API error (sanitized): %s", msg)
+        return "Google Sheets request failed"
+    return msg
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +47,7 @@ async def get_tabs():
         by_type = sheets_client.get_tabs_by_type()
         latest = sheets_client.get_latest_tabs()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
 
     all_tabs = {}
     for wtype, tab_names in by_type.items():
@@ -69,7 +82,7 @@ async def get_workouts():
             session = parser.parse_tab(tab_name, rows)
             sessions.append(session)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return WorkoutPlan(sessions=sessions)
 
 
@@ -96,7 +109,7 @@ async def get_workout_by_type(workout_type: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return session
 
 
@@ -107,7 +120,7 @@ async def get_workout_by_tab(tab_name: str):
         rows = sheets_client.fetch_tab(tab_name)
         session = parser.parse_tab(tab_name, rows)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return session
 
 
@@ -117,7 +130,7 @@ async def log_workout(tab_name: str, req: LogWorkoutRequest):
     try:
         sheets_client.write_cells(tab_name, req.updates)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return {"status": "ok"}
 
 
@@ -132,7 +145,7 @@ async def complete_workout(tab_name: str):
         summaries = history.compute_workout_summary(session.exercises, date.today().isoformat())
         history.append_workout(session.day, session.exercises)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     new_prs = sum(1 for s in summaries if s.is_weight_pr or s.is_1rm_pr)
     return WorkoutSummaryResponse(
         status="ok",
@@ -148,7 +161,7 @@ async def get_streaks():
     try:
         data = history.get_streak_data()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return StreakResponse(streaks=data)
 
 
@@ -157,7 +170,7 @@ async def get_prs():
     try:
         prs = history.get_prs()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return PRsResponse(prs=prs)
 
 
@@ -166,7 +179,7 @@ async def get_progress(exercise: str):
     try:
         data = history.get_exercise_progress(exercise)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     return ProgressResponse(exercise=exercise, history=data)
 
 
@@ -205,11 +218,11 @@ async def backfill_history(offset: int = 0, limit: int = 10):
                 history.append_workout(session.day, session.exercises, workout_date=iso_date)
                 processed += 1
             except Exception as e:
-                errors.append(f"{tab_name}: {e}")
+                errors.append(f"{tab_name}: {_safe_error(e)}")
             # Rate limit: ~2 API calls per tab (read + write), stay under 60/min
             await asyncio.sleep(2.5)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_error(e))
     remaining = max(0, len(all_tabs) - offset - limit)
     return {
         "status": "ok",
