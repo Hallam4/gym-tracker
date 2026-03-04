@@ -114,9 +114,9 @@ export default function TodayWorkout() {
     savePendingWrites(remaining);
   }, []);
 
-  useState(() => {
+  useEffect(() => {
     syncPending();
-  });
+  }, []);
 
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
@@ -191,7 +191,7 @@ export default function TodayWorkout() {
   const exerciseCount = session?.exercises.length ?? 0;
 
   if (isLoading) return (
-    <div className="space-y-4 py-4">
+    <div className="space-y-4 py-4" role="status">
       <div className="flex gap-2 pb-3">
         {[1,2,3,4,5].map(i => <div key={i} className="h-10 w-20 bg-gray-800 rounded-full animate-pulse" />)}
       </div>

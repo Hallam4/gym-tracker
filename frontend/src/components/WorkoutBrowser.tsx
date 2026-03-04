@@ -67,7 +67,7 @@ export default function WorkoutBrowser() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter sessions..."
-            className="w-full bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 rounded-2xl px-4 py-3 touch-target focus:ring-blue-500/70 focus:outline-none transition-shadow duration-200 placeholder:text-gray-500"
+            className="w-full bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 rounded-2xl px-4 py-3 touch-target focus-visible:ring-blue-500/70 focus-visible:outline-none transition-shadow duration-200 placeholder:text-gray-500"
           />
           {reversedTabs
             .filter((tab) =>
@@ -90,13 +90,13 @@ export default function WorkoutBrowser() {
         <div>
           <button
             onClick={() => setSelectedTab(null)}
-            className="text-sm text-blue-400 mb-4 hover:text-blue-300 active:text-blue-200 transition-colors duration-150 min-h-[44px] inline-flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            className="text-sm text-blue-400 mb-4 hover:text-blue-300 active:text-blue-200 transition-colors duration-150 min-h-[44px] inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
           >
             &larr; Back to list
           </button>
 
           {sessionLoading && (
-            <div className="space-y-3 py-4 animate-pulse">
+            <div className="space-y-3 py-4 animate-pulse" role="status">
               {[1,2,3].map(i => <div key={i} className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 space-y-2">
                 <div className="h-4 w-1/2 bg-gray-800 rounded" />
                 <div className="h-3 w-full bg-gray-800 rounded" />

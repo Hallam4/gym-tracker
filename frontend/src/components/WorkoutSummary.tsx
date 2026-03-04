@@ -131,7 +131,7 @@ export default function WorkoutSummary({ data, totalSets, duration, onDismiss }:
             <div className="text-sm font-semibold text-yellow-400 mb-1">
               {data.new_prs_count} New PR{data.new_prs_count > 1 ? "s" : ""}!
             </div>
-            <div className="text-xs text-yellow-400/70">
+            <div className="text-xs text-yellow-400">
               {data.exercise_summaries
                 .filter((e) => e.is_weight_pr || e.is_1rm_pr)
                 .map((e) => e.exercise)

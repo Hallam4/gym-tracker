@@ -9,7 +9,7 @@ export default function PRBoard() {
   });
 
   if (isLoading) return (
-    <div className="space-y-3 py-4">
+    <div className="space-y-3 py-4" role="status">
       <div className="h-6 w-40 bg-gray-800 rounded animate-pulse mb-4" />
       {[1,2,3].map(i => <div key={i} className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 animate-pulse">
         <div className="h-4 w-1/3 bg-gray-800 rounded mb-3" />
@@ -32,7 +32,7 @@ export default function PRBoard() {
 
   if (prs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-gray-400">
         No PRs yet. Complete some workouts to start tracking records.
       </div>
     );
