@@ -278,9 +278,9 @@ def compute_double_progression(
         by_date.setdefault(row.date, []).append(row)
     sorted_dates = sorted(by_date.keys(), reverse=True)
 
-    # Take the 2 most recent sessions
+    # Take up to 6 most recent sessions (to see through deload weeks)
     recent_sessions = []
-    for d in sorted_dates[:2]:
+    for d in sorted_dates[:6]:
         rows = by_date[d]
         # Use first row for that date (one history entry per exercise per date)
         row = rows[0]
@@ -290,26 +290,40 @@ def compute_double_progression(
             if s
         ]
         weight = _parse_weight(row.weight)
-        recent_sessions.append({"date": d, "reps": set_reps, "weight": weight})
+        recent_sessions.append({"date": d, "reps": set_reps, "weight": weight, "notes": row.notes})
 
+    # Filter deloads: auto-detect by weight threshold + manual [DELOAD] marker
+    working_weight = max(s["weight"] for s in recent_sessions) if recent_sessions else 0
+    deload_threshold = working_weight * 0.85
+
+    working_sessions = [
+        s for s in recent_sessions
+        if s["weight"] >= deload_threshold and "[DELOAD]" not in (s.get("notes") or "")
+    ]
+    if not working_sessions:
+        working_sessions = [recent_sessions[0]]  # fallback: treat most recent as working
+
+    # prev_sets/prev_weight = what user actually did last (including deloads)
     prev = recent_sessions[0]
     prev_sets = prev["reps"]
     prev_weight = prev["weight"]
 
-    # Count consecutive sessions at ceiling (all sets >= rep_max)
+    # Count consecutive working sessions at ceiling (all sets >= rep_max)
     sessions_at_ceiling = 0
-    for sess in recent_sessions:
+    for sess in working_sessions:
         if sess["reps"] and all(r >= rep_max for r in sess["reps"]):
             sessions_at_ceiling += 1
         else:
             break
 
-    # Weight increase: need 2 consecutive sessions at ceiling
+    # Weight increase: need 2 consecutive working sessions at ceiling
+    # Base weight on most recent working session, not deload
+    base_weight = working_sessions[0]["weight"]
     if sessions_at_ceiling >= 2:
-        suggested_weight = str(prev_weight + 2.5)
+        suggested_weight = str(base_weight + 2.5)
         suggested_target = str(rep_min)
     else:
-        suggested_weight = str(prev_weight) if prev_weight > 0 else None
+        suggested_weight = str(base_weight) if base_weight > 0 else None
         suggested_target = str(rep_max)
 
     return {

@@ -27,6 +27,7 @@ interface Props {
   className?: string;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  isDeload?: boolean;
   isSkipped?: boolean;
   onSkipToggle?: () => void;
 }
@@ -43,6 +44,7 @@ export default function ExerciseCard({
   className = "mb-3",
   expanded: controlledExpanded,
   onToggleExpand,
+  isDeload = false,
   isSkipped = false,
   onSkipToggle,
 }: Props) {
@@ -153,7 +155,7 @@ export default function ExerciseCard({
   );
 
   return (
-    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 ${isSkipped ? "opacity-50" : ""} ${className}`}>
+    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ${isDeload && !isSkipped ? "ring-amber-800/40" : "ring-gray-800/60"} ${isSkipped ? "opacity-50" : ""} ${className}`}>
       {/* Exercise header */}
       <div className="flex items-center gap-2">
       {onSkipToggle && (

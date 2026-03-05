@@ -47,6 +47,7 @@ export default function TodayWorkout() {
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [summaryData, setSummaryData] = useState<WorkoutSummaryResponse | null>(null);
   const [skippedExercises, setSkippedExercises] = useState<Set<number>>(new Set());
+  const [isDeload, setIsDeload] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
@@ -246,7 +247,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setSelectedType(t); }}
+            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setSelectedType(t); }}
             aria-pressed={selectedType === t}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
               selectedType === t
@@ -290,6 +291,21 @@ export default function TodayWorkout() {
           Last set @ {Math.floor(lastSetTime / 60)}:{(lastSetTime % 60).toString().padStart(2, "0")}
         </div>
       )}
+
+      {/* Deload toggle */}
+      <div className="flex justify-center mb-4">
+        <button
+          onClick={() => setIsDeload((d) => !d)}
+          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+            isDeload
+              ? "bg-amber-900/60 text-amber-300 ring-1 ring-amber-700/60"
+              : "bg-gray-800/50 text-gray-500 ring-1 ring-gray-700/40 hover:text-gray-400"
+          }`}
+          aria-pressed={isDeload}
+        >
+          {isDeload ? "Deload Active" : "Deload Week"}
+        </button>
+      </div>
 
       {/* Progress bar */}
       {totalSets > 0 && (
@@ -339,6 +355,7 @@ export default function TodayWorkout() {
                 onProgressChange={(done, total) =>
                   handleProgressChange(`${group.groupId}-${i}`, done, total)
                 }
+                isDeload={isDeload}
                 isSkipped={skippedExercises.has(ex.sheet_row)}
                 onSkipToggle={() => handleSkipToggle(ex)}
                 hideSetInfo={group.isSuperset}
@@ -372,10 +389,25 @@ export default function TodayWorkout() {
       {confirmVisible && (
         <ConfirmModal
           title="Complete workout?"
-          summary={`${exerciseCount} exercises${skippedCount > 0 ? ` (${skippedCount} skipped)` : ""}, ${doneSets}/${totalSets} sets completed`}
+          summary={`${isDeload ? "Deload workout: " : ""}${exerciseCount} exercises${skippedCount > 0 ? ` (${skippedCount} skipped)` : ""}, ${doneSets}/${totalSets} sets completed`}
           onCancel={() => setConfirmVisible(false)}
           onConfirm={async () => {
             setConfirmVisible(false);
+            // Prepend [DELOAD] to notes for all exercises when deload mode is active
+            if (isDeload) {
+              for (const ex of session.exercises) {
+                if (ex.notes_col != null) {
+                  const existing = ex.notes || "";
+                  if (!existing.includes("[DELOAD]")) {
+                    writeQueue.enqueue({
+                      row: ex.sheet_row,
+                      col: ex.notes_col,
+                      value: existing ? `[DELOAD] ${existing}` : "[DELOAD]",
+                    });
+                  }
+                }
+              }
+            }
             await writeQueue.flush();
             completeMutation.mutate(session.tab_name);
           }}
@@ -408,6 +440,7 @@ export default function TodayWorkout() {
             setLastSetTime(null);
             setGroupLastSetTime(new Map());
             setSkippedExercises(new Set());
+            setIsDeload(false);
           }}
         />
       )}
