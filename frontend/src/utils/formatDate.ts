@@ -7,9 +7,7 @@ export function fmtDate(dateStr: string): string {
   const day = d.getDate();
   const mon = SHORT_MONTHS[d.getMonth()];
   const year = d.getFullYear();
-  const currentYear = new Date().getFullYear();
-  // Omit year if it's the current year
-  return year === currentYear ? `${day} ${mon}` : `${day} ${mon} ${year}`;
+  return `${day} ${mon} ${year}`;
 }
 
 const MONTHS: Record<string, number> = {
@@ -26,7 +24,6 @@ export function fmtTabName(tabName: string): string {
   const mon = MONTHS[monName];
   if (!mon) return tabName;
   const yr = m[3] ? 2000 + parseInt(m[3]) : new Date().getFullYear();
-  const currentYear = new Date().getFullYear();
-  const datePart = yr === currentYear ? `${day} ${monName}` : `${day} ${monName} ${yr}`;
+  const datePart = `${day} ${monName} ${yr}`;
   return `${datePart} \u2014 ${m[4]}`;
 }
