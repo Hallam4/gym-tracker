@@ -2,6 +2,10 @@ from datetime import date, datetime, timedelta
 import sheets_client
 from models import Exercise, CompletedExercise, HistoryRow, HistorySession, ExerciseProgress, PREntry, ExerciseSummary, StreakData
 
+# Map short codes to History tab labels and vice versa
+_CODE_TO_LABEL = sheets_client.WORKOUT_TYPES  # U1 → Upper 1
+_LABEL_TO_CODE = sheets_client.WORKOUT_TYPE_CODES  # Upper 1 → U1
+
 HISTORY_TAB = "History"
 HISTORY_HEADER = [
     "Date", "Day", "Exercise", "Weight", "Sets",
@@ -30,6 +34,7 @@ def _ensure_history_tab():
 def append_workout(day: str, exercises: list[Exercise], workout_date: str | None = None):
     """Append completed exercises to the History tab."""
     today = workout_date or date.today().isoformat()
+    day_label = _CODE_TO_LABEL.get(day, day)
 
     # Build set of existing (date, exercise) pairs to prevent duplicates
     existing = get_all_history()
@@ -47,7 +52,7 @@ def append_workout(day: str, exercises: list[Exercise], workout_date: str | None
             continue
         row = [
             today,
-            day,
+            day_label,
             ex.name,
             ex.weight,
             ex.sets,
@@ -339,11 +344,19 @@ def get_history_sessions(type_filter: str | None = None, limit: int = 50, offset
     """Group all History rows by (date, day), return sorted most-recent-first."""
     all_rows = get_all_history()
 
+    # Resolve filter: accept both short codes (U1) and long labels (Upper 1)
+    filter_label = None
+    if type_filter:
+        upper = type_filter.upper()
+        filter_label = _CODE_TO_LABEL.get(type_filter) or _CODE_TO_LABEL.get(upper)
+        if not filter_label:
+            filter_label = type_filter  # already a long label
+
     # Group by (date, day)
     grouped: dict[tuple[str, str], list[HistoryRow]] = {}
     for row in all_rows:
         key = (row.date, row.day)
-        if type_filter and row.day.upper() != type_filter.upper():
+        if filter_label and row.day != filter_label:
             continue
         grouped.setdefault(key, []).append(row)
 
@@ -358,8 +371,9 @@ def get_history_sessions(type_filter: str | None = None, limit: int = 50, offset
 
 def get_history_session(date_str: str, day: str) -> HistorySession | None:
     """Single session lookup by date and day."""
+    day_label = _CODE_TO_LABEL.get(day, day)
     all_rows = get_all_history()
-    matching = [r for r in all_rows if r.date == date_str and r.day == day]
+    matching = [r for r in all_rows if r.date == date_str and r.day == day_label]
     if not matching:
         return None
     return HistorySession(date=date_str, day=day, exercises=matching)
@@ -368,6 +382,7 @@ def get_history_session(date_str: str, day: str) -> HistorySession | None:
 def append_completed_workout(day: str, exercises: list[CompletedExercise], is_deload: bool = False, workout_date: str | None = None):
     """Append completed exercises from frontend payload to History tab."""
     today = workout_date or date.today().isoformat()
+    day_label = _CODE_TO_LABEL.get(day, day)  # U1 → Upper 1
 
     existing = get_all_history()
     existing_keys: set[tuple[str, str]] = set()
@@ -385,7 +400,7 @@ def append_completed_workout(day: str, exercises: list[CompletedExercise], is_de
             notes = f"[DELOAD] {notes}".strip()
         row = [
             today,
-            day,
+            day_label,
             ex.name,
             ex.weight,
             ex.sets,

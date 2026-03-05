@@ -8,6 +8,10 @@ from google.oauth2 import service_account
 
 SPREADSHEET_ID = "1h_HHlAL8dZhHFRunnQvQDbGB73Q7SotiFxWy6bC5rf0"
 WORKOUT_TYPES = {"U1": "Upper 1", "U2": "Upper 2", "L1": "Lower 1", "L2": "Lower 2", "Arm": "Arms"}
+# Reverse lookup: long name → short code
+WORKOUT_TYPE_CODES = {v: k for k, v in WORKOUT_TYPES.items()}
+# Long names used in History tab
+WORKOUT_TYPE_LABELS = {k: v for k, v in WORKOUT_TYPES.items()}
 
 _cache: dict[str, tuple[float, object]] = {}
 CACHE_TTL = 300  # 5 minutes
