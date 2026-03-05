@@ -39,51 +39,6 @@ def _get_service():
     return _service
 
 
-def _classify_tab(tab_name: str) -> str | None:
-    """Extract workout type from tab name. Returns U1/U2/L1/L2/Arm or None."""
-    name = tab_name.strip()
-    if name == "History":
-        return None
-    # Match patterns like "26Feb23 U1", "25Aug11 U1", " 24 Apr  L2", "25 Apr Arm"
-    for wtype in WORKOUT_TYPES:
-        if re.search(rf'\b{re.escape(wtype)}\b', name, re.IGNORECASE):
-            return wtype
-    return None
-
-
-def get_all_tab_names() -> list[str]:
-    """Get all tab names from the spreadsheet."""
-    now = time.time()
-    cache_key = "__tab_names__"
-    if cache_key in _cache:
-        cached_time, cached_data = _cache[cache_key]
-        if now - cached_time < CACHE_TTL:
-            return cached_data
-
-    service = _get_service()
-    meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
-    names = [s["properties"]["title"] for s in meta["sheets"]]
-    _cache[cache_key] = (now, names)
-    return names
-
-
-def get_tabs_by_type() -> dict[str, list[str]]:
-    """Group tab names by workout type. Returns {type: [tab_names]} ordered by tab position (newest last)."""
-    all_tabs = get_all_tab_names()
-    by_type: dict[str, list[str]] = {wt: [] for wt in WORKOUT_TYPES}
-    for tab in all_tabs:
-        wtype = _classify_tab(tab)
-        if wtype:
-            by_type[wtype].append(tab)
-    return by_type
-
-
-def get_latest_tabs() -> dict[str, str]:
-    """Get the most recent (last) tab name for each workout type."""
-    by_type = get_tabs_by_type()
-    return {wtype: tabs[-1] for wtype, tabs in by_type.items() if tabs}
-
-
 def fetch_tab(tab_name: str) -> list[list[str]]:
     """Fetch all data from a tab, with caching."""
     now = time.time()

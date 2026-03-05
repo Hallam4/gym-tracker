@@ -62,9 +62,9 @@ export default function StreakDashboard() {
     queryFn: api.getStreaks,
   });
 
-  const { data: workouts } = useQuery({
-    queryKey: ["workouts"],
-    queryFn: api.getWorkouts,
+  const { data: sessionsData } = useQuery({
+    queryKey: ["history-sessions-all"],
+    queryFn: () => api.getHistorySessions({ limit: 50 }),
   });
 
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -73,8 +73,8 @@ export default function StreakDashboard() {
 
   const workoutInfoMap = useCallback(() => {
     const map = new Map<string, { name: string; exerciseCount: number }>();
-    if (!workouts?.sessions) return map;
-    for (const session of workouts.sessions) {
+    if (!sessionsData?.sessions) return map;
+    for (const session of sessionsData.sessions) {
       if (session.date) {
         map.set(session.date, {
           name: session.day,
@@ -83,7 +83,7 @@ export default function StreakDashboard() {
       }
     }
     return map;
-  }, [workouts])();
+  }, [sessionsData])();
 
   const showTooltip = useCallback((iso: string, hasWorkout: boolean, el: HTMLElement) => {
     if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);

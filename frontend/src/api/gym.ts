@@ -27,21 +27,6 @@ export interface WorkoutSession {
   exercises: Exercise[];
 }
 
-export interface WorkoutPlan {
-  sessions: WorkoutSession[];
-}
-
-export interface TabInfo {
-  tab_name: string;
-  workout_type: string;
-  type_label: string;
-}
-
-export interface TabsResponse {
-  latest: Record<string, TabInfo>;
-  all_tabs: Record<string, TabInfo[]>;
-}
-
 export interface ExerciseProgress {
   date: string;
   weight: number;
@@ -175,20 +160,6 @@ export const api = {
   },
   getHistorySession: (date: string, day: string) =>
     fetchJSON<HistorySession>(`/api/history/session/${encodeURIComponent(date)}/${encodeURIComponent(day)}`),
-
-  // Legacy endpoints (kept for backward compat)
-  getTabs: () => fetchJSON<TabsResponse>("/api/tabs"),
-  getWorkouts: () => fetchJSON<WorkoutPlan>("/api/workouts"),
-  getWorkoutByType: (type: string) =>
-    fetchJSON<WorkoutSession>(`/api/workouts/by-type/${type}`),
-  getWorkoutByTab: (tabName: string) =>
-    fetchJSON<WorkoutSession>(`/api/workouts/tab/${encodeURIComponent(tabName)}`),
-  logWorkout: (tabName: string, updates: { row: number; col: number; value: string }[]) =>
-    postJSON<{ status: string }>(`/api/workouts/tab/${encodeURIComponent(tabName)}/log`, { updates }),
-  completeWorkout: (tabName: string) =>
-    postJSON<WorkoutSummaryResponse>(
-      `/api/workouts/tab/${encodeURIComponent(tabName)}/complete`
-    ),
   getProgress: (exercise: string) =>
     fetchJSON<ProgressResponse>(`/api/progress/${encodeURIComponent(exercise)}`),
   getPRs: () => fetchJSON<PRsResponse>("/api/prs"),

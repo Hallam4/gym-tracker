@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Exercise(BaseModel):
@@ -25,38 +25,6 @@ class WorkoutSession(BaseModel):
     date: str
     tab_name: str
     exercises: list[Exercise]
-
-
-class WorkoutPlan(BaseModel):
-    sessions: list[WorkoutSession]
-
-
-class TabInfo(BaseModel):
-    tab_name: str
-    workout_type: str  # U1, U2, L1, L2, Arm
-    type_label: str    # "Upper 1", "Upper 2", etc.
-
-
-class TabsResponse(BaseModel):
-    latest: dict[str, TabInfo]            # most recent tab per type
-    all_tabs: dict[str, list[TabInfo]]    # all tabs grouped by type
-
-
-class LogSetRequest(BaseModel):
-    exercise_index: int
-    set_number: int  # 1-5
-    reps: int | None = None
-    weight: float | None = None
-
-
-class CellUpdate(BaseModel):
-    row: int = Field(ge=0, le=1000)
-    col: int = Field(ge=0, le=50)
-    value: str = Field(max_length=500)
-
-
-class LogWorkoutRequest(BaseModel):
-    updates: list[CellUpdate]
 
 
 class HistoryRow(BaseModel):

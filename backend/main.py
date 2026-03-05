@@ -1,8 +1,5 @@
-import asyncio
 import logging
 import os
-import re
-from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 import sheets_client
@@ -11,12 +8,8 @@ import history
 from models import (
     Exercise,
     WorkoutSession,
-    WorkoutPlan,
-    LogWorkoutRequest,
     ProgressResponse,
     PRsResponse,
-    TabInfo,
-    TabsResponse,
     WorkoutSummaryResponse,
     StreakResponse,
     CompleteWorkoutRequest,
@@ -81,123 +74,6 @@ def _enrich_with_progression(session: WorkoutSession):
             ex.prev_sets = result["prev_sets"]
             ex.prev_weight = result["prev_weight"]
             ex.sessions_at_ceiling = result["sessions_at_ceiling"]
-
-
-@app.get("/api/tabs", response_model=TabsResponse)
-async def get_tabs():
-    """Get all workout tabs grouped by type, with the latest for each."""
-    try:
-        by_type = sheets_client.get_tabs_by_type()
-        latest = sheets_client.get_latest_tabs()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-
-    all_tabs = {}
-    for wtype, tab_names in by_type.items():
-        all_tabs[wtype] = [
-            TabInfo(
-                tab_name=name,
-                workout_type=wtype,
-                type_label=sheets_client.WORKOUT_TYPES[wtype],
-            )
-            for name in tab_names
-        ]
-
-    latest_infos = {}
-    for wtype, tab_name in latest.items():
-        latest_infos[wtype] = TabInfo(
-            tab_name=tab_name,
-            workout_type=wtype,
-            type_label=sheets_client.WORKOUT_TYPES[wtype],
-        )
-
-    return TabsResponse(latest=latest_infos, all_tabs=all_tabs)
-
-
-@app.get("/api/workouts", response_model=WorkoutPlan)
-async def get_workouts():
-    """Get the most recent workout for each type."""
-    try:
-        latest = sheets_client.get_latest_tabs()
-        sessions = []
-        for wtype, tab_name in latest.items():
-            rows = sheets_client.fetch_tab(tab_name)
-            session = parser.parse_tab(tab_name, rows)
-            sessions.append(session)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    return WorkoutPlan(sessions=sessions)
-
-
-@app.get("/api/workouts/by-type/{workout_type}", response_model=WorkoutSession)
-async def get_workout_by_type(workout_type: str):
-    """Get the most recent workout for a given type (u1, u2, l1, l2, arm)."""
-    wtype = workout_type.upper()
-    if wtype not in sheets_client.WORKOUT_TYPES:
-        # Try case-insensitive match
-        for k in sheets_client.WORKOUT_TYPES:
-            if k.lower() == workout_type.lower():
-                wtype = k
-                break
-        else:
-            raise HTTPException(status_code=404, detail=f"Unknown workout type: {workout_type}")
-
-    try:
-        latest = sheets_client.get_latest_tabs()
-        tab_name = latest.get(wtype)
-        if not tab_name:
-            raise HTTPException(status_code=404, detail=f"No tabs found for type: {wtype}")
-        rows = sheets_client.fetch_tab(tab_name)
-        session = parser.parse_tab(tab_name, rows)
-        _enrich_with_progression(session)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    return session
-
-
-@app.get("/api/workouts/tab/{tab_name:path}", response_model=WorkoutSession)
-async def get_workout_by_tab(tab_name: str):
-    """Get a specific workout tab by its exact name."""
-    try:
-        rows = sheets_client.fetch_tab(tab_name)
-        session = parser.parse_tab(tab_name, rows)
-        _enrich_with_progression(session)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    return session
-
-
-@app.post("/api/workouts/tab/{tab_name:path}/log", dependencies=[Depends(_require_api_key)])
-async def log_workout(tab_name: str, req: LogWorkoutRequest):
-    """Write cell updates to a specific tab."""
-    try:
-        sheets_client.write_cells(tab_name, [u.model_dump() for u in req.updates])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    return {"status": "ok"}
-
-
-@app.post("/api/workouts/tab/{tab_name:path}/complete", response_model=WorkoutSummaryResponse, dependencies=[Depends(_require_api_key)])
-async def complete_workout(tab_name: str):
-    """Mark a workout as complete — saves to History tab and returns summary."""
-    try:
-        rows = sheets_client.fetch_tab(tab_name)
-        session = parser.parse_tab(tab_name, rows)
-        # Compute summary BEFORE appending so current session isn't in "prior" data
-        from datetime import date
-        summaries = history.compute_workout_summary(session.exercises, date.today().isoformat())
-        history.append_workout(session.day, session.exercises)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    new_prs = sum(1 for s in summaries if s.is_weight_pr or s.is_1rm_pr)
-    return WorkoutSummaryResponse(
-        status="ok",
-        exercises_logged=len(summaries),
-        exercise_summaries=summaries,
-        new_prs_count=new_prs,
-    )
 
 
 @app.get("/api/structure/{workout_type}", response_model=WorkoutSession)
@@ -352,133 +228,15 @@ async def get_progress(exercise: str):
     return ProgressResponse(exercise=exercise, history=data)
 
 
-@app.post("/api/history/backfill", dependencies=[Depends(_require_api_key)])
-async def backfill_history(offset: int = 0, limit: int = 10):
-    """Backfill the History tab from existing workout tabs.
-
-    Processes `limit` tabs starting at `offset` to stay within request timeouts.
-    Call repeatedly with increasing offset until remaining == 0.
-    """
-    try:
-        by_type = sheets_client.get_tabs_by_type()
-        all_tabs = [
-            tab_name
-            for tab_names in by_type.values()
-            for tab_name in tab_names
-        ]
-        batch = all_tabs[offset:offset + limit]
-        processed = 0
-        errors = []
-        for tab_name in batch:
-            try:
-                rows = sheets_client.fetch_tab(tab_name)
-                session = parser.parse_tab(tab_name, rows)
-                # Convert human date like "2 February 2026" to ISO "2026-02-02"
-                iso_date = None
-                if session.date:
-                    try:
-                        iso_date = datetime.strptime(session.date, "%d %B %Y").strftime("%Y-%m-%d")
-                    except ValueError:
-                        errors.append(f"{tab_name}: could not parse date '{session.date}'")
-                        continue
-                else:
-                    errors.append(f"{tab_name}: no date found")
-                    continue
-                history.append_workout(session.day, session.exercises, workout_date=iso_date)
-                processed += 1
-            except Exception as e:
-                errors.append(f"{tab_name}: {_safe_error(e)}")
-            # Rate limit: ~2 API calls per tab (read + write), stay under 60/min
-            await asyncio.sleep(2.5)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-    remaining = max(0, len(all_tabs) - offset - limit)
-    return {
-        "status": "ok",
-        "tabs_processed": processed,
-        "total_tabs": len(all_tabs),
-        "offset": offset,
-        "remaining": remaining,
-        "errors": errors,
-    }
-
-
 @app.post("/api/cache/invalidate", dependencies=[Depends(_require_api_key)])
 async def invalidate_cache():
     sheets_client.invalidate_cache()
     return {"status": "ok"}
 
 
-
-_TAB_DATE_RE = re.compile(r"(\d{2})([A-Za-z]{3,4})(\d{1,2})\s")
-_MONTH_MAP = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "sept": 9, "spet": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-
-def _parse_date_from_tab_name(tab_name: str) -> str | None:
-    """Parse date from tab name format YYMonDD (e.g. '26Feb17 U1' → '17 February 2026')."""
-    m = _TAB_DATE_RE.search(tab_name)
-    if not m:
-        return None
-    year = 2000 + int(m.group(1))
-    month_num = _MONTH_MAP.get(m.group(2).lower())
-    day = int(m.group(3))
-    if not month_num:
-        return None
-    try:
-        dt = datetime(year, month_num, day)
-        return dt.strftime("%-d %B %Y")
-    except ValueError:
-        return None
-
-
-@app.post("/api/fix-dates", dependencies=[Depends(_require_api_key)])
-async def fix_dates(dry_run: bool = True):
-    """Fix dates in row 1 of each tab based on the tab name (authoritative source).
-
-    Pass ?dry_run=false to actually write corrections.
-    """
-    try:
-        by_type = sheets_client.get_tabs_by_type()
-        all_tabs = [tab for tabs in by_type.values() for tab in tabs]
-
-        fixes = []
-        errors = []
-        for tab_name in all_tabs:
-            parsed_date = _parse_date_from_tab_name(tab_name)
-            if not parsed_date:
-                errors.append(f"{tab_name}: could not parse date from tab name")
-                continue
-            try:
-                rows = sheets_client.fetch_tab(tab_name)
-                current_date = rows[1][1].strip() if len(rows) > 1 and len(rows[1]) > 1 else ""
-                if current_date != parsed_date:
-                    fixes.append({
-                        "tab": tab_name,
-                        "current": current_date,
-                        "corrected": parsed_date,
-                    })
-                    if not dry_run:
-                        sheets_client.write_cells(tab_name, [{"row": 1, "col": 1, "value": parsed_date}])
-                        await asyncio.sleep(2)  # rate limit
-            except Exception as e:
-                errors.append(f"{tab_name}: {_safe_error(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_error(e))
-
-    return {
-        "status": "dry_run" if dry_run else "applied",
-        "fixes": fixes,
-        "total_fixes": len(fixes),
-        "errors": errors,
-    }
-
-
 @app.get("/")
 async def root():
-    return {"app": "Gym Tracker API", "health": "/health", "docs": "/api/tabs"}
+    return {"app": "Gym Tracker API", "health": "/health"}
 
 
 @app.get("/health")

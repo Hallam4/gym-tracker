@@ -38,10 +38,10 @@ export default function ProgressCharts() {
   const [exercise, setExercise] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  // Fetch all workouts to get exercise list
-  const { data: workouts } = useQuery({
-    queryKey: ["workouts"],
-    queryFn: api.getWorkouts,
+  // Fetch recent history sessions to build exercise name list
+  const { data: sessionsData } = useQuery({
+    queryKey: ["history-sessions-all"],
+    queryFn: () => api.getHistorySessions({ limit: 50 }),
   });
 
   // Fetch progress for selected exercise
@@ -51,10 +51,10 @@ export default function ProgressCharts() {
     enabled: !!exercise,
   });
 
-  // Deduplicated exercise names from all workouts
+  // Deduplicated exercise names from history
   const allExercises = Array.from(
     new Set(
-      workouts?.sessions.flatMap((s) => s.exercises.map((e) => e.name)) ?? []
+      sessionsData?.sessions.flatMap((s) => s.exercises.map((e) => e.exercise)) ?? []
     )
   ).sort();
 
