@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import os
+import re
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 import sheets_client
 import parser
@@ -21,6 +23,16 @@ from models import (
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Gym Tracker API", docs_url=None, redoc_url=None)
+
+GYM_API_KEY = os.environ.get("GYM_API_KEY", "")
+
+
+def _require_api_key(x_api_key: str = Header(None)):
+    """Validate API key on write endpoints."""
+    if not GYM_API_KEY:
+        return  # No key configured — skip auth (dev mode)
+    if x_api_key != GYM_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 def _safe_error(e: Exception) -> str:
@@ -153,7 +165,7 @@ async def get_workout_by_tab(tab_name: str):
     return session
 
 
-@app.post("/api/workouts/tab/{tab_name:path}/log")
+@app.post("/api/workouts/tab/{tab_name:path}/log", dependencies=[Depends(_require_api_key)])
 async def log_workout(tab_name: str, req: LogWorkoutRequest):
     """Write cell updates to a specific tab."""
     try:
@@ -163,7 +175,7 @@ async def log_workout(tab_name: str, req: LogWorkoutRequest):
     return {"status": "ok"}
 
 
-@app.post("/api/workouts/tab/{tab_name:path}/complete", response_model=WorkoutSummaryResponse)
+@app.post("/api/workouts/tab/{tab_name:path}/complete", response_model=WorkoutSummaryResponse, dependencies=[Depends(_require_api_key)])
 async def complete_workout(tab_name: str):
     """Mark a workout as complete — saves to History tab and returns summary."""
     try:
@@ -212,7 +224,7 @@ async def get_progress(exercise: str):
     return ProgressResponse(exercise=exercise, history=data)
 
 
-@app.post("/api/history/backfill")
+@app.post("/api/history/backfill", dependencies=[Depends(_require_api_key)])
 async def backfill_history(offset: int = 0, limit: int = 10):
     """Backfill the History tab from existing workout tabs.
 
@@ -263,11 +275,82 @@ async def backfill_history(offset: int = 0, limit: int = 10):
     }
 
 
-@app.post("/api/cache/invalidate")
+@app.post("/api/cache/invalidate", dependencies=[Depends(_require_api_key)])
 async def invalidate_cache():
     sheets_client.invalidate_cache()
     return {"status": "ok"}
 
+
+
+_TAB_DATE_RE = re.compile(r"(\d{2})([A-Za-z]{3})(\d{1,2})\s")
+_MONTH_MAP = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _parse_date_from_tab_name(tab_name: str) -> str | None:
+    """Parse date from tab name format YYMonDD (e.g. '26Feb23 U1' → '23 February 2026')."""
+    m = _TAB_DATE_RE.search(tab_name)
+    if not m:
+        return None
+    year = 2000 + int(m.group(1))
+    month_num = _MONTH_MAP.get(m.group(2).lower())
+    day = int(m.group(3))
+    if not month_num:
+        return None
+    try:
+        dt = datetime(year, month_num, day)
+        return dt.strftime("%-d %B %Y")
+    except ValueError:
+        return None
+
+
+@app.post("/api/fix-dates", dependencies=[Depends(_require_api_key)])
+async def fix_dates(dry_run: bool = True):
+    """Fix dates in row 1 of each tab based on the tab name (authoritative source).
+
+    Pass ?dry_run=false to actually write corrections.
+    """
+    try:
+        by_type = sheets_client.get_tabs_by_type()
+        all_tabs = [tab for tabs in by_type.values() for tab in tabs]
+
+        fixes = []
+        errors = []
+        for tab_name in all_tabs:
+            parsed_date = _parse_date_from_tab_name(tab_name)
+            if not parsed_date:
+                errors.append(f"{tab_name}: could not parse date from tab name")
+                continue
+            try:
+                rows = sheets_client.fetch_tab(tab_name)
+                current_date = rows[1][1].strip() if len(rows) > 1 and len(rows[1]) > 1 else ""
+                if current_date != parsed_date:
+                    fixes.append({
+                        "tab": tab_name,
+                        "current": current_date,
+                        "corrected": parsed_date,
+                    })
+                    if not dry_run:
+                        sheets_client.write_cells(tab_name, [{"row": 1, "col": 1, "value": parsed_date}])
+                        await asyncio.sleep(2)  # rate limit
+            except Exception as e:
+                errors.append(f"{tab_name}: {_safe_error(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+
+    return {
+        "status": "dry_run" if dry_run else "applied",
+        "fixes": fixes,
+        "total_fixes": len(fixes),
+        "errors": errors,
+    }
+
+
+@app.get("/")
+async def root():
+    return {"app": "Gym Tracker API", "health": "/health", "docs": "/api/tabs"}
 
 
 @app.get("/health")

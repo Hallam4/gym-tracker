@@ -119,6 +119,8 @@ def fetch_tab(tab_name: str) -> list[list[str]]:
 
 def write_cells(tab_name: str, updates: list[dict]):
     """Write values to specific cells. Each update: {row, col, value}."""
+    if not updates:
+        return
     service = _get_write_service()
     data = []
     for u in updates:

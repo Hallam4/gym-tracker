@@ -185,6 +185,10 @@ def get_prs() -> list[PREntry]:
                         best_1rm = e1rm
                         best_1rm_date = row.date
 
+        # Skip exercises with no recorded weight (bodyweight-only or empty)
+        if best_weight == 0.0:
+            continue
+
         prs.append(
             PREntry(
                 exercise=exercise,

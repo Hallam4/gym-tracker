@@ -1,4 +1,5 @@
 const BASE = import.meta.env.VITE_API_URL || "";
+const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 export interface Exercise {
   name: string;
@@ -102,9 +103,11 @@ async function fetchJSON<T>(url: string): Promise<T> {
 }
 
 async function postJSON<T>(url: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (API_KEY) headers["X-API-Key"] = API_KEY;
   const res = await fetch(`${BASE}${url}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
