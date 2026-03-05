@@ -290,13 +290,13 @@ _MONTH_MAP = {
 
 
 def _parse_date_from_tab_name(tab_name: str) -> str | None:
-    """Parse date from tab name format DDMonYY (e.g. '17Feb26 U1' → '17 February 2026')."""
+    """Parse date from tab name format YYMonDD (e.g. '26Feb17 U1' → '17 February 2026')."""
     m = _TAB_DATE_RE.search(tab_name)
     if not m:
         return None
-    day = int(m.group(1))
+    year = 2000 + int(m.group(1))
     month_num = _MONTH_MAP.get(m.group(2).lower())
-    year = 2000 + int(m.group(3))
+    day = int(m.group(3))
     if not month_num:
         return None
     try:
