@@ -282,10 +282,10 @@ async def invalidate_cache():
 
 
 
-_TAB_DATE_RE = re.compile(r"(\d{2})([A-Za-z]{3})(\d{1,2})\s")
+_TAB_DATE_RE = re.compile(r"(\d{2})([A-Za-z]{3,4})(\d{1,2})\s")
 _MONTH_MAP = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    "jul": 7, "aug": 8, "sep": 9, "sept": 9, "spet": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
 
