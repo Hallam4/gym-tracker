@@ -27,6 +27,8 @@ interface Props {
   className?: string;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  isSkipped?: boolean;
+  onSkipToggle?: () => void;
 }
 
 export default function ExerciseCard({
@@ -41,9 +43,11 @@ export default function ExerciseCard({
   className = "mb-3",
   expanded: controlledExpanded,
   onToggleExpand,
+  isSkipped = false,
+  onSkipToggle,
 }: Props) {
   const [localExpanded, setLocalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? localExpanded;
+  const isExpanded = isSkipped ? false : (controlledExpanded ?? localExpanded);
   const toggleExpand = onToggleExpand ?? (() => setLocalExpanded((e) => !e));
   const [localWeight, setLocalWeight] = useState(exercise.suggested_weight ?? exercise.weight);
   const [localNotes, setLocalNotes] = useState(exercise.notes);
@@ -72,8 +76,20 @@ export default function ExerciseCard({
   const sessionsAtCeiling = exercise.sessions_at_ceiling ?? 0;
 
   useEffect(() => {
-    onProgressChange?.(normalDone, totalSets);
-  }, [normalDone, totalSets, onProgressChange]);
+    if (isSkipped) {
+      onProgressChange?.(0, 0);
+    } else {
+      onProgressChange?.(normalDone, totalSets);
+    }
+  }, [normalDone, totalSets, onProgressChange, isSkipped]);
+
+  // Reset local state when exercise is skipped
+  useEffect(() => {
+    if (isSkipped) {
+      setCompletedSets(Array.from({ length: MAX_SETS }, () => null));
+      setSetTimes(Array.from({ length: MAX_SETS }, () => null));
+    }
+  }, [isSkipped]);
 
   useEffect(() => {
     return () => {
@@ -137,11 +153,26 @@ export default function ExerciseCard({
   );
 
   return (
-    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 ${className}`}>
+    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 ${isSkipped ? "opacity-50" : ""} ${className}`}>
       {/* Exercise header */}
+      <div className="flex items-center gap-2">
+      {onSkipToggle && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSkipToggle(); }}
+          className={`shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-all duration-150 min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            isSkipped
+              ? "bg-amber-900/50 text-amber-400 ring-1 ring-amber-700/50"
+              : "bg-gray-800/50 text-gray-500 hover:text-gray-400 hover:bg-gray-800"
+          }`}
+          aria-label={isSkipped ? `Unskip ${exercise.name}` : `Skip ${exercise.name}`}
+        >
+          {isSkipped ? "Skipped" : "Skip"}
+        </button>
+      )}
       <button
         type="button"
-        className="flex items-center justify-between w-full cursor-pointer select-none text-left min-h-[44px] active:opacity-80 transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+        className="flex items-center justify-between flex-1 min-w-0 cursor-pointer select-none text-left min-h-[44px] active:opacity-80 transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
         onClick={toggleExpand}
         aria-expanded={isExpanded}
         aria-controls={`exercise-details-${exercise.sheet_row}`}
@@ -159,20 +190,26 @@ export default function ExerciseCard({
             {/* Row 1: Name + set count + timer */}
             <div className="flex items-center gap-2">
               <span className="font-medium text-white truncate">{exercise.name}</span>
-              <div className={`shrink-0 text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
-                allDone
-                  ? "bg-green-900/50 text-green-400"
-                  : "bg-gray-800/70 text-gray-400"
-              }`}>
-                {allDone && <span className="mr-0.5" aria-hidden="true">&#10003;</span>}
-                <span className="sr-only">{normalDone} of {totalSets} sets completed{bonusDone > 0 ? `, plus ${bonusDone} bonus` : ""}</span>
-                <span aria-hidden="true">
-                  {normalDone}/{totalSets}
-                  {bonusDone > 0 && (
-                    <span className="text-blue-400"> +{bonusDone}</span>
-                  )}
-                </span>
-              </div>
+              {isSkipped ? (
+                <div className="shrink-0 text-xs px-1.5 py-0.5 rounded-md bg-amber-900/50 text-amber-400">
+                  Skipped
+                </div>
+              ) : (
+                <div className={`shrink-0 text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
+                  allDone
+                    ? "bg-green-900/50 text-green-400"
+                    : "bg-gray-800/70 text-gray-400"
+                }`}>
+                  {allDone && <span className="mr-0.5" aria-hidden="true">&#10003;</span>}
+                  <span className="sr-only">{normalDone} of {totalSets} sets completed{bonusDone > 0 ? `, plus ${bonusDone} bonus` : ""}</span>
+                  <span aria-hidden="true">
+                    {normalDone}/{totalSets}
+                    {bonusDone > 0 && (
+                      <span className="text-blue-400"> +{bonusDone}</span>
+                    )}
+                  </span>
+                </div>
+              )}
               {lastGroupSetTime != null && (
                 <span className="shrink-0 text-[10px] font-mono text-gray-400" aria-label={`Last set at ${fmtTime(lastGroupSetTime)}`}>
                   {fmtTime(lastGroupSetTime)}
@@ -228,6 +265,7 @@ export default function ExerciseCard({
           </div>
         </div>
       </button>
+      </div>
 
       {/* Expand/collapse with CSS grid animation */}
       <div

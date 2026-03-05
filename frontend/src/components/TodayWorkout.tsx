@@ -46,6 +46,7 @@ export default function TodayWorkout() {
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [summaryData, setSummaryData] = useState<WorkoutSummaryResponse | null>(null);
+  const [skippedExercises, setSkippedExercises] = useState<Set<number>>(new Set());
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
@@ -149,6 +150,25 @@ export default function TodayWorkout() {
     [session, writeQueue]
   );
 
+  const handleSkipToggle = useCallback(
+    (exercise: WorkoutSession["exercises"][0]) => {
+      setSkippedExercises((prev) => {
+        const next = new Set(prev);
+        if (next.has(exercise.sheet_row)) {
+          next.delete(exercise.sheet_row);
+        } else {
+          next.add(exercise.sheet_row);
+          // Clear any already-logged sets in the sheet (columns 5-9)
+          for (let col = 5; col <= 9; col++) {
+            writeQueue.enqueue({ row: exercise.sheet_row, col, value: "" });
+          }
+        }
+        return next;
+      });
+    },
+    [writeQueue]
+  );
+
   const toggleGroup = useCallback((groupId: number) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -189,6 +209,7 @@ export default function TodayWorkout() {
 
   // Build confirm summary
   const exerciseCount = session?.exercises.length ?? 0;
+  const skippedCount = skippedExercises.size;
 
   if (isLoading) return (
     <div className="space-y-4 py-4" role="status">
@@ -225,7 +246,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSelectedType(t); }}
+            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setSelectedType(t); }}
             aria-pressed={selectedType === t}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
               selectedType === t
@@ -318,6 +339,8 @@ export default function TodayWorkout() {
                 onProgressChange={(done, total) =>
                   handleProgressChange(`${group.groupId}-${i}`, done, total)
                 }
+                isSkipped={skippedExercises.has(ex.sheet_row)}
+                onSkipToggle={() => handleSkipToggle(ex)}
                 hideSetInfo={group.isSuperset}
                 className={group.isSuperset ? "mb-1" : "mb-3"}
                 {...(group.isSuperset
@@ -349,7 +372,7 @@ export default function TodayWorkout() {
       {confirmVisible && (
         <ConfirmModal
           title="Complete workout?"
-          summary={`${exerciseCount} exercises, ${doneSets}/${totalSets} sets completed`}
+          summary={`${exerciseCount} exercises${skippedCount > 0 ? ` (${skippedCount} skipped)` : ""}, ${doneSets}/${totalSets} sets completed`}
           onCancel={() => setConfirmVisible(false)}
           onConfirm={async () => {
             setConfirmVisible(false);
@@ -384,6 +407,7 @@ export default function TodayWorkout() {
             setTimerRunning(false);
             setLastSetTime(null);
             setGroupLastSetTime(new Map());
+            setSkippedExercises(new Set());
           }}
         />
       )}
