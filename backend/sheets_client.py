@@ -142,6 +142,14 @@ def append_rows(tab_name: str, rows: list[list[str]]):
     _cache.pop(tab_name, None)
 
 
+STRUCTURE_TAB = "Structure"
+
+
+def update_structure_cells(updates: list[dict]):
+    """Write weight/target back to Structure tab after double-progression."""
+    write_cells(STRUCTURE_TAB, updates)
+
+
 def invalidate_cache():
     """Clear all cached data."""
     _cache.clear()

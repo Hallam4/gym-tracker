@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 import sheets_client
-from models import Exercise, HistoryRow, ExerciseProgress, PREntry, ExerciseSummary, StreakData
+from models import Exercise, CompletedExercise, HistoryRow, HistorySession, ExerciseProgress, PREntry, ExerciseSummary, StreakData
 
 HISTORY_TAB = "History"
 HISTORY_HEADER = [
@@ -333,6 +333,70 @@ def compute_double_progression(
         "prev_weight": prev_weight,
         "sessions_at_ceiling": sessions_at_ceiling,
     }
+
+
+def get_history_sessions(type_filter: str | None = None, limit: int = 50, offset: int = 0) -> list[HistorySession]:
+    """Group all History rows by (date, day), return sorted most-recent-first."""
+    all_rows = get_all_history()
+
+    # Group by (date, day)
+    grouped: dict[tuple[str, str], list[HistoryRow]] = {}
+    for row in all_rows:
+        key = (row.date, row.day)
+        if type_filter and row.day.upper() != type_filter.upper():
+            continue
+        grouped.setdefault(key, []).append(row)
+
+    # Sort by date descending
+    sorted_keys = sorted(grouped.keys(), key=lambda k: k[0], reverse=True)
+
+    sessions = []
+    for d, day in sorted_keys[offset:offset + limit]:
+        sessions.append(HistorySession(date=d, day=day, exercises=grouped[(d, day)]))
+    return sessions
+
+
+def get_history_session(date_str: str, day: str) -> HistorySession | None:
+    """Single session lookup by date and day."""
+    all_rows = get_all_history()
+    matching = [r for r in all_rows if r.date == date_str and r.day == day]
+    if not matching:
+        return None
+    return HistorySession(date=date_str, day=day, exercises=matching)
+
+
+def append_completed_workout(day: str, exercises: list[CompletedExercise], is_deload: bool = False, workout_date: str | None = None):
+    """Append completed exercises from frontend payload to History tab."""
+    today = workout_date or date.today().isoformat()
+
+    existing = get_all_history()
+    existing_keys: set[tuple[str, str]] = set()
+    for row in existing:
+        existing_keys.add((row.date, row.exercise))
+
+    rows = []
+    for ex in exercises:
+        if not any(s for s in ex.set_results if s):
+            continue
+        if (today, ex.name) in existing_keys:
+            continue
+        notes = ex.notes
+        if is_deload and "[DELOAD]" not in notes:
+            notes = f"[DELOAD] {notes}".strip()
+        row = [
+            today,
+            day,
+            ex.name,
+            ex.weight,
+            ex.sets,
+            *[s if s else "" for s in (ex.set_results + [""] * 5)[:5]],
+            *[r if r else "" for r in (ex.rest_times + [""] * 4)[:4]],
+            notes,
+        ]
+        rows.append(row)
+
+    if rows:
+        sheets_client.append_rows(HISTORY_TAB, rows)
 
 
 def get_streak_data() -> StreakData:

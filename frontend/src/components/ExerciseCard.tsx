@@ -20,6 +20,7 @@ interface Props {
   timerSeconds: number;
   lastGroupSetTime: number | null;
   onSetComplete: (setIndex: number, reps: number) => void;
+  onSetUndo?: (setIndex: number) => void;
   onWeightChange: (weight: string) => void;
   onNotesChange?: (notes: string) => void;
   onProgressChange?: (done: number, total: number) => void;
@@ -37,6 +38,7 @@ export default function ExerciseCard({
   timerSeconds,
   lastGroupSetTime,
   onSetComplete,
+  onSetUndo,
   onWeightChange,
   onNotesChange,
   onProgressChange,
@@ -117,6 +119,7 @@ export default function ExerciseCard({
         newSets[setIndex] = null;
         newTimes[setIndex] = null;
         setJustCompleted(null);
+        onSetUndo?.(setIndex);
       } else {
         newSets[setIndex] = targetReps;
         newTimes[setIndex] = timerSeconds;

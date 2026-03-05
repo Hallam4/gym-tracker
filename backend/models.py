@@ -129,3 +129,30 @@ class StreakData(BaseModel):
 
 class StreakResponse(BaseModel):
     streaks: StreakData
+
+
+class CompletedExercise(BaseModel):
+    name: str
+    weight: str
+    sets: str
+    reps: str
+    target: str
+    set_results: list[str]
+    rest_times: list[str]
+    notes: str
+
+
+class CompleteWorkoutRequest(BaseModel):
+    day: str
+    exercises: list[CompletedExercise]
+    is_deload: bool = False
+
+
+class HistorySession(BaseModel):
+    date: str
+    day: str
+    exercises: list[HistoryRow]
+
+
+class HistorySessionsResponse(BaseModel):
+    sessions: list[HistorySession]

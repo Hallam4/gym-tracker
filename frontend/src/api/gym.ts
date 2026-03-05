@@ -114,7 +114,69 @@ async function postJSON<T>(url: string, body?: unknown): Promise<T> {
   return res.json();
 }
 
+export interface CompletedExercise {
+  name: string;
+  weight: string;
+  sets: string;
+  reps: string;
+  target: string;
+  set_results: string[];
+  rest_times: string[];
+  notes: string;
+}
+
+export interface CompleteWorkoutRequest {
+  day: string;
+  exercises: CompletedExercise[];
+  is_deload: boolean;
+}
+
+export interface HistoryExercise {
+  date: string;
+  day: string;
+  exercise: string;
+  weight: string;
+  sets: string;
+  set1: string;
+  set2: string;
+  set3: string;
+  set4: string;
+  set5: string;
+  rest1: string;
+  rest2: string;
+  rest3: string;
+  rest4: string;
+  notes: string;
+}
+
+export interface HistorySession {
+  date: string;
+  day: string;
+  exercises: HistoryExercise[];
+}
+
+export interface HistorySessionsResponse {
+  sessions: HistorySession[];
+}
+
 export const api = {
+  // New Structure-based endpoints
+  getStructure: (type: string) =>
+    fetchJSON<WorkoutSession>(`/api/structure/${type}`),
+  completeWorkoutNew: (data: CompleteWorkoutRequest) =>
+    postJSON<WorkoutSummaryResponse>("/api/workouts/complete", data),
+  getHistorySessions: (params?: { type?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.type) q.set("type", params.type);
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    return fetchJSON<HistorySessionsResponse>(`/api/history/sessions${qs ? `?${qs}` : ""}`);
+  },
+  getHistorySession: (date: string, day: string) =>
+    fetchJSON<HistorySession>(`/api/history/session/${encodeURIComponent(date)}/${encodeURIComponent(day)}`),
+
+  // Legacy endpoints (kept for backward compat)
   getTabs: () => fetchJSON<TabsResponse>("/api/tabs"),
   getWorkouts: () => fetchJSON<WorkoutPlan>("/api/workouts"),
   getWorkoutByType: (type: string) =>

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, WorkoutSession } from "../api/gym";
-import { groupExercises } from "../utils/groupExercises";
-import { fmtDate, fmtTabName } from "../utils/formatDate";
+import { api, HistorySession, HistoryExercise } from "../api/gym";
+import { fmtDate } from "../utils/formatDate";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -15,23 +14,30 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function WorkoutBrowser() {
   const [selectedType, setSelectedType] = useState<string>("U1");
-  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<{ date: string; day: string } | null>(null);
   const [search, setSearch] = useState("");
 
-  const { data: tabs } = useQuery({
-    queryKey: ["tabs"],
-    queryFn: api.getTabs,
+  const { data: sessionsData } = useQuery({
+    queryKey: ["history-sessions", selectedType],
+    queryFn: () => api.getHistorySessions({ type: selectedType }),
   });
 
-  const { data: session, isLoading: sessionLoading } = useQuery({
-    queryKey: ["workout-tab", selectedTab],
-    queryFn: () => api.getWorkoutByTab(selectedTab!),
-    enabled: !!selectedTab,
+  const { data: sessionDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ["history-session", selectedSession?.date, selectedSession?.day],
+    queryFn: () => api.getHistorySession(selectedSession!.date, selectedSession!.day),
+    enabled: !!selectedSession,
   });
 
-  const typeTabs = tabs?.all_tabs[selectedType] ?? [];
-  // Show most recent first
-  const reversedTabs = [...typeTabs].reverse();
+  const sessions = sessionsData?.sessions ?? [];
+
+  // Filter by search (match date or exercise names)
+  const filteredSessions = sessions.filter((s) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    if (fmtDate(s.date).toLowerCase().includes(q)) return true;
+    if (s.date.includes(q)) return true;
+    return s.exercises.some((ex) => ex.exercise.toLowerCase().includes(q));
+  });
 
   return (
     <div>
@@ -42,7 +48,7 @@ export default function WorkoutBrowser() {
             key={t}
             onClick={() => {
               setSelectedType(t);
-              setSelectedTab(null);
+              setSelectedSession(null);
               setSearch("");
             }}
             aria-pressed={selectedType === t}
@@ -57,8 +63,8 @@ export default function WorkoutBrowser() {
         ))}
       </div>
 
-      {/* Tab list or workout detail */}
-      {!selectedTab ? (
+      {/* Session list or detail */}
+      {!selectedSession ? (
         <div className="space-y-3">
           <label htmlFor="session-filter" className="sr-only">Filter sessions</label>
           <input
@@ -69,28 +75,25 @@ export default function WorkoutBrowser() {
             placeholder="Filter sessions..."
             className="w-full bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 rounded-2xl px-4 py-3 touch-target focus-visible:ring-blue-500/70 focus-visible:outline-none transition-shadow duration-200 placeholder:text-gray-500"
           />
-          {reversedTabs
-            .filter((tab) =>
-              fmtTabName(tab.tab_name).toLowerCase().includes(search.toLowerCase())
-            )
-            .map((tab) => (
-              <button
-                key={tab.tab_name}
-                onClick={() => setSelectedTab(tab.tab_name)}
-                className="w-full text-left px-4 py-3 bg-gray-900 rounded-2xl text-gray-300 ring-1 ring-gray-800/60 transition-all duration-150 hover:bg-gray-800/80 active:bg-gray-800 active:scale-[0.99] touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
-              >
-                {fmtTabName(tab.tab_name)}
-              </button>
-            ))}
-          {reversedTabs.length === 0 && !search && (
+          {filteredSessions.map((s) => (
+            <button
+              key={`${s.date}-${s.day}`}
+              onClick={() => setSelectedSession({ date: s.date, day: s.day })}
+              className="w-full text-left px-4 py-3 bg-gray-900 rounded-2xl text-gray-300 ring-1 ring-gray-800/60 transition-all duration-150 hover:bg-gray-800/80 active:bg-gray-800 active:scale-[0.99] touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+            >
+              <div className="font-medium">{fmtDate(s.date)}</div>
+              <div className="text-sm text-gray-500">
+                {TYPE_LABELS[s.day] || s.day} &middot; {s.exercises.length} exercises
+              </div>
+            </button>
+          ))}
+          {filteredSessions.length === 0 && !search && (
             <div className="text-center py-12 text-gray-500">
               <div className="text-gray-400 font-medium mb-1">No sessions found</div>
               <p className="text-sm">Complete a workout to see it here.</p>
             </div>
           )}
-          {search && reversedTabs.filter((tab) =>
-            fmtTabName(tab.tab_name).toLowerCase().includes(search.toLowerCase())
-          ).length === 0 && (
+          {search && filteredSessions.length === 0 && (
             <div className="text-center py-8 text-gray-500 text-sm">
               No sessions matching &ldquo;{search}&rdquo;
             </div>
@@ -99,13 +102,13 @@ export default function WorkoutBrowser() {
       ) : (
         <div>
           <button
-            onClick={() => setSelectedTab(null)}
+            onClick={() => setSelectedSession(null)}
             className="text-sm text-blue-400 mb-4 hover:text-blue-300 active:text-blue-200 transition-colors duration-150 min-h-[44px] inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
           >
             &larr; Back to list
           </button>
 
-          {sessionLoading && (
+          {detailLoading && (
             <div className="space-y-3 py-4 animate-pulse" role="status">
               {[1,2,3].map(i => <div key={i} className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 space-y-2">
                 <div className="h-4 w-1/2 bg-gray-800 rounded" />
@@ -115,8 +118,8 @@ export default function WorkoutBrowser() {
             </div>
           )}
 
-          {session && (
-            <WorkoutDetail session={session} />
+          {sessionDetail && (
+            <HistoryDetail session={sessionDetail} />
           )}
         </div>
       )}
@@ -124,64 +127,54 @@ export default function WorkoutBrowser() {
   );
 }
 
-function WorkoutDetail({ session }: { session: WorkoutSession }) {
+function HistoryDetail({ session }: { session: HistorySession }) {
   return (
     <article>
       <div className="text-sm text-gray-400 mb-4">
-        {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
+        {TYPE_LABELS[session.day] || session.day} &mdash; {fmtDate(session.date)}
       </div>
 
       <div className="space-y-3">
-        {groupExercises(session.exercises).map((group) => (
-          <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3" : ""}>
-            {group.isSuperset && (
-              <div className="text-xs font-semibold text-blue-400 mb-1">Superset</div>
-            )}
-            {group.exercises.map((ex, i) => (
-              <div key={i} className={`bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 ${group.isSuperset ? "mb-1" : "mb-3"}`}>
-                <h3 className="font-medium text-white mb-2">{ex.name}</h3>
-                <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
-                  <div>
-                    <span className="text-gray-400">Sets:</span> {ex.sets}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Reps:</span> {ex.reps}
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Weight:</span> {ex.weight}
-                  </div>
-                </div>
-                {ex.target && (
-                  <div className="text-sm text-gray-400 mt-1">
-                    Target: {ex.target}
-                  </div>
-                )}
-                {ex.set_results.some((s) => s) && (
-                  <div className="mt-2 flex gap-2 flex-wrap text-sm" aria-label={`Set results for ${ex.name}`}>
-                    {ex.set_results.map(
-                      (s, j) =>
-                        s && (
-                          <span
-                            key={j}
-                            className="bg-gray-800 px-2 py-1 rounded-md text-gray-300 tabular-nums"
-                          >
-                            <span className="sr-only">Set {j + 1}:</span>
-                            <span aria-hidden="true">S{j + 1}: </span>{s}
-                          </span>
-                        )
-                    )}
-                  </div>
-                )}
-                {ex.notes && (
-                  <div className="text-sm text-gray-400 mt-2 italic">
-                    {ex.notes}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        {session.exercises.map((ex, i) => (
+          <HistoryExerciseCard key={i} exercise={ex} />
         ))}
       </div>
     </article>
+  );
+}
+
+function HistoryExerciseCard({ exercise: ex }: { exercise: HistoryExercise }) {
+  const sets = [ex.set1, ex.set2, ex.set3, ex.set4, ex.set5].filter((s) => s);
+
+  return (
+    <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 mb-3">
+      <h3 className="font-medium text-white mb-2">{ex.exercise}</h3>
+      <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
+        <div>
+          <span className="text-gray-400">Sets:</span> {ex.sets}
+        </div>
+        <div>
+          <span className="text-gray-400">Weight:</span> {ex.weight}
+        </div>
+      </div>
+      {sets.length > 0 && (
+        <div className="mt-2 flex gap-2 flex-wrap text-sm" aria-label={`Set results for ${ex.exercise}`}>
+          {sets.map((s, j) => (
+            <span
+              key={j}
+              className="bg-gray-800 px-2 py-1 rounded-md text-gray-300 tabular-nums"
+            >
+              <span className="sr-only">Set {j + 1}:</span>
+              <span aria-hidden="true">S{j + 1}: </span>{s}
+            </span>
+          ))}
+        </div>
+      )}
+      {ex.notes && (
+        <div className="text-sm text-gray-400 mt-2 italic">
+          {ex.notes}
+        </div>
+      )}
+    </div>
   );
 }

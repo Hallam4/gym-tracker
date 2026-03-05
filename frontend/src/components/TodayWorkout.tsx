@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, WorkoutSession, WorkoutSummaryResponse } from "../api/gym";
+import { api, WorkoutSession, WorkoutSummaryResponse, CompletedExercise } from "../api/gym";
 import ExerciseCard from "./ExerciseCard";
 import { groupExercises } from "../utils/groupExercises";
-import { useWriteQueue } from "../hooks/useWriteQueue";
+import { useSessionPersist, SessionState } from "../hooks/useSessionPersist";
 import { fmtDate } from "../utils/formatDate";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
@@ -18,22 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
   Arm: "Arms",
 };
 
-interface PendingWrite {
-  tabName: string;
-  updates: { row: number; col: number; value: string }[];
-}
-
-function loadPendingWrites(): PendingWrite[] {
-  try {
-    return JSON.parse(localStorage.getItem("gym-pending-writes") || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function savePendingWrites(writes: PendingWrite[]) {
-  localStorage.setItem("gym-pending-writes", JSON.stringify(writes));
-}
+const MAX_SETS = 5;
 
 export default function TodayWorkout() {
   const [selectedType, setSelectedType] = useState<string>("U1");
@@ -51,6 +36,17 @@ export default function TodayWorkout() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const queryClient = useQueryClient();
 
+  // Session state stored in localStorage
+  const [sessionState, setSessionState] = useState<SessionState>({
+    setResults: {},
+    weights: {},
+    notes: {},
+    timerSeconds: 0,
+    timerRunning: false,
+  });
+  const { loadState, saveState, clearState } = useSessionPersist(selectedType);
+  const initializedRef = useRef(false);
+
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (!timerRunning) return;
@@ -63,68 +59,58 @@ export default function TodayWorkout() {
   }, [timerRunning]);
 
   const { data: session, isLoading, error } = useQuery({
-    queryKey: ["workout-type", selectedType],
-    queryFn: () => api.getWorkoutByType(selectedType),
+    queryKey: ["workout-structure", selectedType],
+    queryFn: () => api.getStructure(selectedType),
   });
+
+  // Load persisted session state when type changes
+  useEffect(() => {
+    const saved = loadState();
+    setSessionState(saved);
+    setTimerSeconds(saved.timerSeconds);
+    setTimerRunning(saved.timerRunning);
+    initializedRef.current = true;
+  }, [selectedType, loadState]);
+
+  // Persist session state on changes (debounced via hook)
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    saveState({ ...sessionState, timerSeconds, timerRunning });
+  }, [sessionState, timerSeconds, timerRunning, saveState]);
 
   // Reset progress map when session changes
   useEffect(() => {
     setProgressMap(new Map());
-  }, [session?.tab_name]);
-
-  const logMutation = useMutation({
-    mutationFn: (vars: { tabName: string; updates: { row: number; col: number; value: string }[] }) =>
-      api.logWorkout(vars.tabName, vars.updates),
-    onError: (_err, vars) => {
-      const pending = loadPendingWrites();
-      pending.push(vars);
-      savePendingWrites(pending);
-      setToast({ message: "Save failed \u2014 will retry", type: "error" });
-    },
-  });
-
-  const writeQueue = useWriteQueue({
-    debounceMs: 800,
-    onFlush: (updates) => {
-      if (!session) return;
-      return logMutation.mutateAsync({ tabName: session.tab_name, updates });
-    },
-  });
+  }, [selectedType]);
 
   const completeMutation = useMutation({
-    mutationFn: (tabName: string) => api.completeWorkout(tabName),
+    mutationFn: (data: { day: string; exercises: CompletedExercise[]; is_deload: boolean }) =>
+      api.completeWorkoutNew(data),
     onSuccess: (data) => {
       setSummaryData(data);
+      clearState();
     },
     onError: () => {
       setToast({ message: "Failed to save workout", type: "error" });
     },
   });
 
-  // Sync pending writes on mount
-  const syncPending = useCallback(async () => {
-    const pending = loadPendingWrites();
-    if (pending.length === 0) return;
-    const remaining: PendingWrite[] = [];
-    for (const write of pending) {
-      try {
-        await api.logWorkout(write.tabName, write.updates);
-      } catch {
-        remaining.push(write);
-      }
-    }
-    savePendingWrites(remaining);
-  }, []);
-
-  useEffect(() => {
-    syncPending();
+  const updateSessionState = useCallback((updater: (prev: SessionState) => SessionState) => {
+    setSessionState((prev) => {
+      const next = updater(prev);
+      return next;
+    });
   }, []);
 
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
-      if (!session) return;
-      const setCol = 5 + setIndex; // Set 1-5 are columns 5-9
-      writeQueue.enqueue({ row: exercise.sheet_row, col: setCol, value: reps.toString() });
+      updateSessionState((prev) => {
+        const results = { ...prev.setResults };
+        const exSets = [...(results[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
+        exSets[setIndex] = reps;
+        results[exercise.name] = exSets;
+        return { ...prev, setResults: results };
+      });
       setLastSetTime(timerSeconds);
       setGroupLastSetTime((prev) => {
         const next = new Map(prev);
@@ -132,23 +118,40 @@ export default function TodayWorkout() {
         return next;
       });
     },
-    [session, writeQueue, timerSeconds]
+    [timerSeconds, updateSessionState]
+  );
+
+  const handleSetUndo = useCallback(
+    (exercise: WorkoutSession["exercises"][0], setIndex: number) => {
+      updateSessionState((prev) => {
+        const results = { ...prev.setResults };
+        const exSets = [...(results[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
+        exSets[setIndex] = null;
+        results[exercise.name] = exSets;
+        return { ...prev, setResults: results };
+      });
+    },
+    [updateSessionState]
   );
 
   const handleWeightChange = useCallback(
     (exercise: WorkoutSession["exercises"][0], weight: string) => {
-      if (!session) return;
-      writeQueue.enqueue({ row: exercise.sheet_row, col: 3, value: weight });
+      updateSessionState((prev) => ({
+        ...prev,
+        weights: { ...prev.weights, [exercise.name]: weight },
+      }));
     },
-    [session, writeQueue]
+    [updateSessionState]
   );
 
   const handleNotesChange = useCallback(
     (exercise: WorkoutSession["exercises"][0], notes: string) => {
-      if (!session || exercise.notes_col == null) return;
-      writeQueue.enqueue({ row: exercise.sheet_row, col: exercise.notes_col, value: notes });
+      updateSessionState((prev) => ({
+        ...prev,
+        notes: { ...prev.notes, [exercise.name]: notes },
+      }));
     },
-    [session, writeQueue]
+    [updateSessionState]
   );
 
   const handleSkipToggle = useCallback(
@@ -159,15 +162,17 @@ export default function TodayWorkout() {
           next.delete(exercise.sheet_row);
         } else {
           next.add(exercise.sheet_row);
-          // Clear any already-logged sets in the sheet (columns 5-9)
-          for (let col = 5; col <= 9; col++) {
-            writeQueue.enqueue({ row: exercise.sheet_row, col, value: "" });
-          }
+          // Clear set results for this exercise
+          updateSessionState((prev) => {
+            const results = { ...prev.setResults };
+            delete results[exercise.name];
+            return { ...prev, setResults: results };
+          });
         }
         return next;
       });
     },
-    [writeQueue]
+    [updateSessionState]
   );
 
   const toggleGroup = useCallback((groupId: number) => {
@@ -189,6 +194,21 @@ export default function TodayWorkout() {
     []
   );
 
+  // Build exercises with merged local state for rendering
+  const mergedExercises = session?.exercises.map((ex) => {
+    const savedSets = sessionState.setResults[ex.name];
+    const savedWeight = sessionState.weights[ex.name];
+    const savedNotes = sessionState.notes[ex.name];
+    return {
+      ...ex,
+      set_results: savedSets
+        ? savedSets.map((s) => (s !== null ? String(s) : ""))
+        : ex.set_results.length > 0 ? ex.set_results : Array.from({ length: MAX_SETS }, () => ""),
+      weight: savedWeight ?? ex.weight,
+      notes: savedNotes ?? ex.notes,
+    };
+  }) ?? [];
+
   // Aggregate progress
   let totalSets = 0;
   let doneSets = 0;
@@ -198,7 +218,6 @@ export default function TodayWorkout() {
   }
   const progressPct = totalSets > 0 ? Math.min(100, (doneSets / totalSets) * 100) : 0;
 
-  // Progress bar color
   let barColorClass: string;
   if (progressPct >= 90) {
     barColorClass = "bg-gradient-to-r from-green-500 to-emerald-400";
@@ -208,7 +227,6 @@ export default function TodayWorkout() {
     barColorClass = "bg-green-600";
   }
 
-  // Build confirm summary
   const exerciseCount = session?.exercises.length ?? 0;
   const skippedCount = skippedExercises.size;
 
@@ -231,7 +249,7 @@ export default function TodayWorkout() {
       <div className="text-red-400 font-medium mb-2">Could not load workout</div>
       <p className="text-sm text-gray-500 mb-4">Check your connection and try again.</p>
       <button
-        onClick={() => queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] })}
+        onClick={() => queryClient.invalidateQueries({ queryKey: ["workout-structure", selectedType] })}
         className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-sm touch-target hover:bg-gray-700 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         Retry
@@ -247,7 +265,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { writeQueue.flush(); setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setSelectedType(t); }}
+            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setSelectedType(t); }}
             aria-pressed={selectedType === t}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
               selectedType === t
@@ -333,7 +351,7 @@ export default function TodayWorkout() {
 
       {/* Exercise cards */}
       <section aria-label="Exercises">
-        {groupExercises(session.exercises).map((group) => (
+        {groupExercises(mergedExercises).map((group) => (
           <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3 mb-3" : ""}>
             {group.isSuperset && (
               <div className="flex items-center gap-2 mb-1">
@@ -345,11 +363,12 @@ export default function TodayWorkout() {
             )}
             {group.exercises.map((ex, i) => (
               <ExerciseCard
-                key={`${session.tab_name}-${group.groupId}-${i}`}
+                key={`${selectedType}-${group.groupId}-${i}`}
                 exercise={ex}
                 timerSeconds={timerSeconds}
                 lastGroupSetTime={groupLastSetTime.get(ex.superset_group) ?? null}
                 onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
+                onSetUndo={(setIdx) => handleSetUndo(ex, setIdx)}
                 onWeightChange={(w) => handleWeightChange(ex, w)}
                 onNotesChange={(notes) => handleNotesChange(ex, notes)}
                 onProgressChange={(done, total) =>
@@ -391,25 +410,26 @@ export default function TodayWorkout() {
           title="Complete workout?"
           summary={`${isDeload ? "Deload workout: " : ""}${exerciseCount} exercises${skippedCount > 0 ? ` (${skippedCount} skipped)` : ""}, ${doneSets}/${totalSets} sets completed`}
           onCancel={() => setConfirmVisible(false)}
-          onConfirm={async () => {
+          onConfirm={() => {
             setConfirmVisible(false);
-            // Prepend [DELOAD] to notes for all exercises when deload mode is active
-            if (isDeload) {
-              for (const ex of session.exercises) {
-                if (ex.notes_col != null) {
-                  const existing = ex.notes || "";
-                  if (!existing.includes("[DELOAD]")) {
-                    writeQueue.enqueue({
-                      row: ex.sheet_row,
-                      col: ex.notes_col,
-                      value: existing ? `[DELOAD] ${existing}` : "[DELOAD]",
-                    });
-                  }
-                }
-              }
-            }
-            await writeQueue.flush();
-            completeMutation.mutate(session.tab_name);
+            // Build CompletedExercise[] from current state
+            const completed: CompletedExercise[] = mergedExercises
+              .filter((ex) => !skippedExercises.has(ex.sheet_row))
+              .map((ex) => ({
+                name: ex.name,
+                weight: ex.weight,
+                sets: ex.sets,
+                reps: ex.reps,
+                target: ex.target,
+                set_results: ex.set_results,
+                rest_times: ex.rest_times,
+                notes: ex.notes,
+              }));
+            completeMutation.mutate({
+              day: session.day,
+              exercises: completed,
+              is_deload: isDeload,
+            });
           }}
         />
       )}
@@ -431,10 +451,10 @@ export default function TodayWorkout() {
           duration={timerSeconds}
           onDismiss={() => {
             setSummaryData(null);
-            queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] });
+            queryClient.invalidateQueries({ queryKey: ["workout-structure", selectedType] });
             queryClient.invalidateQueries({ queryKey: ["streaks"] });
             queryClient.invalidateQueries({ queryKey: ["prs"] });
-            queryClient.invalidateQueries({ queryKey: ["workout-tab"] });
+            queryClient.invalidateQueries({ queryKey: ["history-sessions"] });
             setToast({ message: "Workout saved!", type: "success" });
             setTimerSeconds(0);
             setTimerRunning(false);

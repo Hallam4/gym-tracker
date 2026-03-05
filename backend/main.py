@@ -9,6 +9,7 @@ import sheets_client
 import parser
 import history
 from models import (
+    Exercise,
     WorkoutSession,
     WorkoutPlan,
     LogWorkoutRequest,
@@ -18,6 +19,9 @@ from models import (
     TabsResponse,
     WorkoutSummaryResponse,
     StreakResponse,
+    CompleteWorkoutRequest,
+    HistorySession,
+    HistorySessionsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -194,6 +198,130 @@ async def complete_workout(tab_name: str):
         exercise_summaries=summaries,
         new_prs_count=new_prs,
     )
+
+
+@app.get("/api/structure/{workout_type}", response_model=WorkoutSession)
+async def get_structure(workout_type: str):
+    """Get workout structure for a given type from the Structure tab."""
+    wtype = workout_type.upper()
+    if wtype not in sheets_client.WORKOUT_TYPES:
+        for k in sheets_client.WORKOUT_TYPES:
+            if k.lower() == workout_type.lower():
+                wtype = k
+                break
+        else:
+            raise HTTPException(status_code=404, detail=f"Unknown workout type: {workout_type}")
+
+    try:
+        rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
+        by_type = parser.parse_structure_tab(rows)
+        exercises = by_type.get(wtype, [])
+        if not exercises:
+            raise HTTPException(status_code=404, detail=f"No exercises found for type: {wtype}")
+        from datetime import date as date_cls
+        session = WorkoutSession(
+            day=wtype,
+            date=date_cls.today().strftime("%-d %B %Y"),
+            tab_name="Structure",
+            exercises=exercises,
+        )
+        _enrich_with_progression(session)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return session
+
+
+@app.post("/api/workouts/complete", response_model=WorkoutSummaryResponse, dependencies=[Depends(_require_api_key)])
+async def complete_workout_new(req: CompleteWorkoutRequest):
+    """Complete a workout — saves to History and optionally updates Structure weights."""
+    try:
+        from datetime import date as date_cls
+        today = date_cls.today().isoformat()
+
+        # Build Exercise objects for summary computation
+        summary_exercises = []
+        for ex in req.exercises:
+            summary_exercises.append(Exercise(
+                name=ex.name,
+                reps=ex.reps,
+                sets=ex.sets,
+                weight=ex.weight,
+                target=ex.target,
+                set_results=ex.set_results,
+                rest_times=ex.rest_times,
+                notes=ex.notes,
+                notes_col=None,
+                sheet_row=0,
+                superset_group=0,
+            ))
+
+        summaries = history.compute_workout_summary(summary_exercises, today)
+        history.append_completed_workout(req.day, req.exercises, req.is_deload)
+
+        # Update Structure weight/target if double-progression fires
+        all_history = history.get_all_history()
+        rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
+        by_type = parser.parse_structure_tab(rows)
+        structure_exercises = by_type.get(req.day, [])
+
+        updates = []
+        for struct_ex in structure_exercises:
+            rep_min, rep_max = _parse_rep_range(struct_ex.target, struct_ex.reps)
+            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history)
+            if result and result["sessions_at_ceiling"] >= 2:
+                if result["suggested_weight"]:
+                    # Weight column = col_map["weight"] from Structure header
+                    header = rows[0]
+                    weight_col = None
+                    target_col = None
+                    for j, cell in enumerate(header):
+                        key = cell.strip().lower()
+                        if key == "weight":
+                            weight_col = j
+                        elif key == "target":
+                            target_col = j
+                    if weight_col is not None:
+                        updates.append({"row": struct_ex.sheet_row, "col": weight_col, "value": f"{result['suggested_weight']}kg"})
+                    if target_col is not None and result["suggested_target"]:
+                        updates.append({"row": struct_ex.sheet_row, "col": target_col, "value": result["suggested_target"]})
+
+        if updates:
+            sheets_client.update_structure_cells(updates)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+
+    new_prs = sum(1 for s in summaries if s.is_weight_pr or s.is_1rm_pr)
+    return WorkoutSummaryResponse(
+        status="ok",
+        exercises_logged=len(summaries),
+        exercise_summaries=summaries,
+        new_prs_count=new_prs,
+    )
+
+
+@app.get("/api/history/sessions", response_model=HistorySessionsResponse)
+async def get_history_sessions(type: str | None = None, limit: int = 50, offset: int = 0):
+    """Get history sessions, optionally filtered by type."""
+    try:
+        sessions = history.get_history_sessions(type_filter=type, limit=limit, offset=offset)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return HistorySessionsResponse(sessions=sessions)
+
+
+@app.get("/api/history/session/{date}/{day}", response_model=HistorySession)
+async def get_history_session(date: str, day: str):
+    """Get a single history session by date and day."""
+    try:
+        session = history.get_history_session(date, day)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @app.get("/api/streaks", response_model=StreakResponse)
