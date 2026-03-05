@@ -83,7 +83,17 @@ export default function WorkoutBrowser() {
               </button>
             ))}
           {reversedTabs.length === 0 && !search && (
-            <div className="text-center py-8 text-gray-500">No sessions found</div>
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-gray-400 font-medium mb-1">No sessions found</div>
+              <p className="text-sm">Complete a workout to see it here.</p>
+            </div>
+          )}
+          {search && reversedTabs.filter((tab) =>
+            fmtTabName(tab.tab_name).toLowerCase().includes(search.toLowerCase())
+          ).length === 0 && (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              No sessions matching &ldquo;{search}&rdquo;
+            </div>
           )}
         </div>
       ) : (

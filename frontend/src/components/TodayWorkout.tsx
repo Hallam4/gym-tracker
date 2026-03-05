@@ -204,7 +204,18 @@ export default function TodayWorkout() {
       </div>)}
     </div>
   );
-  if (error) return <div className="text-center py-8 text-red-400" role="alert">Error loading workout</div>;
+  if (error) return (
+    <div className="text-center py-12" role="alert">
+      <div className="text-red-400 font-medium mb-2">Could not load workout</div>
+      <p className="text-sm text-gray-500 mb-4">Check your connection and try again.</p>
+      <button
+        onClick={() => queryClient.invalidateQueries({ queryKey: ["workout-type", selectedType] })}
+        className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-sm touch-target hover:bg-gray-700 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        Retry
+      </button>
+    </div>
+  );
   if (!session) return null;
 
   return (

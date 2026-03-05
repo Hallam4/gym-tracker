@@ -7,6 +7,14 @@ function fmtTime(s: number) {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
+/** Format prev_sets into a human-readable string like "3x10" or "10, 10, 8" */
+function fmtPrevSets(sets: number[]): string {
+  if (sets.length === 0) return "";
+  const allSame = sets.every((s) => s === sets[0]);
+  if (allSame) return `${sets.length}\u00d7${sets[0]}`;
+  return sets.join(", ");
+}
+
 interface Props {
   exercise: Exercise;
   timerSeconds: number;
@@ -56,6 +64,12 @@ export default function ExerciseCard({
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
   const allDone = normalDone === totalSets;
+
+  // Detect if there's a weight suggestion different from the previous weight
+  const suggestedWeight = exercise.suggested_weight;
+  const prevWeight = exercise.prev_weight;
+  const isWeightIncrease = suggestedWeight != null && prevWeight != null && parseFloat(suggestedWeight) > prevWeight;
+  const sessionsAtCeiling = exercise.sessions_at_ceiling ?? 0;
 
   useEffect(() => {
     onProgressChange?.(normalDone, totalSets);
@@ -141,7 +155,8 @@ export default function ExerciseCard({
           >
             &#9656;
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
+            {/* Row 1: Name + set count + timer */}
             <div className="flex items-center gap-2">
               <span className="font-medium text-white truncate">{exercise.name}</span>
               <div className={`shrink-0 text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
@@ -164,6 +179,8 @@ export default function ExerciseCard({
                 </span>
               )}
             </div>
+
+            {/* Row 2: Target info pills */}
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {!hideSetInfo && (
                 <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
@@ -178,20 +195,34 @@ export default function ExerciseCard({
                   Target {targetReps} @ {localWeight}kg
                 </span>
               )}
-              {exercise.sessions_at_ceiling != null && exercise.sessions_at_ceiling > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  exercise.sessions_at_ceiling >= 2
-                    ? "bg-green-900/40 text-green-400"
-                    : "bg-yellow-900/40 text-yellow-400"
-                }`}>
-                  {exercise.sessions_at_ceiling}/2
-                </span>
-              )}
             </div>
+
+            {/* Row 3: Previous session context */}
             {exercise.prev_sets && exercise.prev_sets.length > 0 && (
-              <div className="text-[10px] text-gray-500 mt-0.5">
-                Last: {exercise.prev_sets.join(", ")}
+              <div className="text-[11px] text-gray-500 mt-1">
+                Last: {fmtPrevSets(exercise.prev_sets)}
                 {exercise.prev_weight != null && ` @ ${exercise.prev_weight}kg`}
+              </div>
+            )}
+
+            {/* Row 4: Progression signals */}
+            {sessionsAtCeiling > 0 && (
+              <div className="mt-1">
+                {isWeightIncrease ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
+                    <span aria-hidden="true">&#8593;</span>
+                    Weight up! Hit target {sessionsAtCeiling}x in a row
+                  </span>
+                ) : sessionsAtCeiling >= 2 ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
+                    <span aria-hidden="true">&#9733;</span>
+                    Hit target {sessionsAtCeiling}x -- ready to go up
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-yellow-400/80 px-2 py-0.5 bg-yellow-900/30 rounded-full">
+                    Hit target {sessionsAtCeiling}/2 sessions
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -217,8 +248,19 @@ export default function ExerciseCard({
               -
             </button>
             <div className="text-center" aria-live="polite">
-              <div className="text-2xl font-bold text-white">{localWeight}</div>
+              <div className="text-2xl font-bold text-white tabular-nums">{localWeight}</div>
               <div className="text-xs text-gray-400">kg</div>
+              {/* Show where the suggestion came from */}
+              {isWeightIncrease && localWeight === suggestedWeight && (
+                <div className="text-[10px] text-green-400 mt-0.5">
+                  +{(parseFloat(suggestedWeight) - prevWeight).toFixed(1)} suggested
+                </div>
+              )}
+              {prevWeight != null && localWeight !== String(prevWeight) && !isWeightIncrease && (
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  prev {prevWeight}
+                </div>
+              )}
             </div>
             <button
               onClick={() => adjustWeight(2.5)}
@@ -266,6 +308,9 @@ export default function ExerciseCard({
                   ? `Bonus set ${i + 1 - totalSets}. Tap to log.`
                   : `Set ${i + 1}. Tap to log ${targetReps} reps.`;
 
+              // Show prev rep count under empty sets for comparison
+              const prevRep = exercise.prev_sets?.[i];
+
               return (
                 <div key={i} className="text-center">
                   <button
@@ -280,6 +325,11 @@ export default function ExerciseCard({
                   {isDone && setTimes[i] != null && (
                     <div className="text-[10px] font-mono text-gray-400 mt-0.5" aria-hidden="true">
                       {fmtTime(setTimes[i]!)}
+                    </div>
+                  )}
+                  {!isDone && !isBonus && prevRep != null && (
+                    <div className="text-[10px] text-gray-600 mt-0.5" aria-hidden="true">
+                      {prevRep}
                     </div>
                   )}
                   {isDone && (

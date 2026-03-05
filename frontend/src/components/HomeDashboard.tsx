@@ -78,7 +78,7 @@ export default function HomeDashboard({ onNavigate }: Props) {
 
       <button
         onClick={() => onNavigate("today")}
-        className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm touch-target hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+        className="w-full py-4 rounded-2xl bg-blue-600 text-white font-bold text-base touch-target shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
       >
         Start Workout
       </button>

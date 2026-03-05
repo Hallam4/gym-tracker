@@ -26,7 +26,12 @@ export default function PRBoard() {
       </div>)}
     </div>
   );
-  if (error) return <div className="text-center py-8 text-red-400" role="alert">Error loading PRs</div>;
+  if (error) return (
+    <div className="text-center py-12" role="alert">
+      <div className="text-red-400 font-medium mb-2">Could not load PRs</div>
+      <p className="text-sm text-gray-500">Check your connection and try again.</p>
+    </div>
+  );
 
   const prs = data?.prs ?? [];
 

@@ -145,11 +145,11 @@ export default function StreakDashboard() {
       >
         <div className="flex gap-[3px]">
           {/* Day labels */}
-          <div className="flex flex-col gap-[3px] mr-1" aria-hidden="true">
+          <div className="flex flex-col gap-[3px] mr-1.5" aria-hidden="true">
             {DAYS.map((d, i) => (
               <div
                 key={i}
-                className="w-3 h-3 flex items-center justify-center text-[8px] text-gray-500"
+                className="w-3.5 h-3.5 flex items-center justify-center text-[9px] text-gray-500"
               >
                 {i % 2 === 0 ? d : ""}
               </div>
@@ -165,7 +165,7 @@ export default function StreakDashboard() {
                 return (
                   <div
                     key={di}
-                    className={`w-3 h-3 rounded-[2px] transition-opacity duration-150 ${
+                    className={`w-3.5 h-3.5 rounded-[3px] transition-opacity duration-150 ${
                       isFuture
                         ? "bg-gray-800/30"
                         : hasWorkout

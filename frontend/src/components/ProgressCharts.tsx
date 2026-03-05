@@ -12,14 +12,27 @@ import {
 } from "recharts";
 import { api } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
-import StreakDashboard from "./StreakDashboard";
 
 const tooltipStyle = {
   backgroundColor: "#111827",
   border: "1px solid #374151",
   borderRadius: "12px",
   color: "#fff",
+  fontSize: "12px",
 };
+
+const METRIC_LABELS: Record<string, string> = {
+  weight: "Weight",
+  volume: "Volume",
+  best_reps: "Best Reps",
+  estimated_1rm: "Est. 1RM",
+};
+
+function tooltipFormatter(value: number, name: string) {
+  const label = METRIC_LABELS[name] ?? name;
+  const suffix = name === "weight" || name === "estimated_1rm" ? "kg" : "";
+  return [`${value}${suffix}`, label];
+}
 
 export default function ProgressCharts() {
   const [exercise, setExercise] = useState("");
@@ -56,8 +69,6 @@ export default function ProgressCharts() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-bold text-white">Progress</h2>
-
-      <StreakDashboard />
 
       {/* Exercise search */}
       <div className="space-y-3">
@@ -142,7 +153,7 @@ export default function ProgressCharts() {
                   axisLine={false}
                 />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} formatter={tooltipFormatter} labelFormatter={fmtDate} />
                 <Area
                   type="monotone"
                   dataKey="weight"
@@ -182,7 +193,7 @@ export default function ProgressCharts() {
                   axisLine={false}
                 />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} formatter={tooltipFormatter} labelFormatter={fmtDate} />
                 <Area
                   type="monotone"
                   dataKey="volume"
@@ -222,7 +233,7 @@ export default function ProgressCharts() {
                   axisLine={false}
                 />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} formatter={tooltipFormatter} labelFormatter={fmtDate} />
                 <Area
                   type="monotone"
                   dataKey="best_reps"
@@ -262,7 +273,7 @@ export default function ProgressCharts() {
                   axisLine={false}
                 />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} formatter={tooltipFormatter} labelFormatter={fmtDate} />
                 <Area
                   type="monotone"
                   dataKey="estimated_1rm"
