@@ -40,14 +40,24 @@ app.add_middleware(
 )
 
 
+def _parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
+    """Parse target/reps into (rep_min, rep_max), handling ranges and AMRAP."""
+    for val in (target, reps):
+        if not val or val.upper() == "AMRAP":
+            continue
+        if "-" in val:
+            lo, hi = val.split("-", 1)
+            return int(lo), int(hi)
+        n = int(val)
+        return max(1, n - 2), n
+    return 8, 12  # sensible default for AMRAP / missing data
+
+
 def _enrich_with_progression(session: WorkoutSession):
     """Add double-progression suggestions to each exercise in the session."""
     all_history = history.get_all_history()
     for ex in session.exercises:
-        rep_max = int(ex.target) if ex.target else (int(ex.reps) if ex.reps else 10)
-        rep_min = int(ex.reps) if ex.reps else rep_max
-        if rep_min == rep_max:
-            rep_min = max(1, rep_max - 2)
+        rep_min, rep_max = _parse_rep_range(ex.target, ex.reps)
         result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history)
         if result:
             ex.suggested_weight = result["suggested_weight"]
