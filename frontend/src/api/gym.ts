@@ -12,6 +12,11 @@ export interface Exercise {
   notes_col: number | null;
   sheet_row: number;
   superset_group: number;
+  suggested_weight?: string | null;
+  suggested_target?: string | null;
+  prev_sets?: number[] | null;
+  prev_weight?: number | null;
+  sessions_at_ceiling?: number | null;
 }
 
 export interface WorkoutSession {

@@ -37,7 +37,7 @@ export default function ExerciseCard({
   const [localExpanded, setLocalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? localExpanded;
   const toggleExpand = onToggleExpand ?? (() => setLocalExpanded((e) => !e));
-  const [localWeight, setLocalWeight] = useState(exercise.weight);
+  const [localWeight, setLocalWeight] = useState(exercise.suggested_weight ?? exercise.weight);
   const [localNotes, setLocalNotes] = useState(exercise.notes);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
     const parsed = exercise.set_results.map((s) => (s ? parseInt(s) || null : null));
@@ -51,7 +51,7 @@ export default function ExerciseCard({
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
-  const targetReps = parseInt(exercise.target) || parseInt(exercise.reps) || 10;
+  const targetReps = parseInt(exercise.suggested_target ?? "") || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
@@ -175,10 +175,25 @@ export default function ExerciseCard({
               </span>
               {exercise.target && (
                 <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                  Target {exercise.target} @ {localWeight}kg
+                  Target {targetReps} @ {localWeight}kg
+                </span>
+              )}
+              {exercise.sessions_at_ceiling != null && exercise.sessions_at_ceiling > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  exercise.sessions_at_ceiling >= 2
+                    ? "bg-green-900/40 text-green-400"
+                    : "bg-yellow-900/40 text-yellow-400"
+                }`}>
+                  {exercise.sessions_at_ceiling}/2
                 </span>
               )}
             </div>
+            {exercise.prev_sets && exercise.prev_sets.length > 0 && (
+              <div className="text-[10px] text-gray-500 mt-0.5">
+                Last: {exercise.prev_sets.join(", ")}
+                {exercise.prev_weight != null && ` @ ${exercise.prev_weight}kg`}
+              </div>
+            )}
           </div>
         </div>
       </button>

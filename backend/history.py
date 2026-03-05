@@ -253,6 +253,70 @@ def compute_workout_summary(exercises: list[Exercise], today_date: str) -> list[
     return summaries
 
 
+def compute_double_progression(
+    exercise_name: str,
+    rep_min: int,
+    rep_max: int,
+    history_rows: list[HistoryRow],
+) -> dict | None:
+    """Compute suggested weight/target using double progression with 2-session confirmation.
+
+    Returns None if no history exists (use sheet defaults).
+    """
+    name_lower = exercise_name.lower()
+    matching = [r for r in history_rows if r.exercise.lower() == name_lower]
+    if not matching:
+        return None
+
+    # Group by date, sort descending
+    by_date: dict[str, list[HistoryRow]] = {}
+    for row in matching:
+        by_date.setdefault(row.date, []).append(row)
+    sorted_dates = sorted(by_date.keys(), reverse=True)
+
+    # Take the 2 most recent sessions
+    recent_sessions = []
+    for d in sorted_dates[:2]:
+        rows = by_date[d]
+        # Use first row for that date (one history entry per exercise per date)
+        row = rows[0]
+        set_reps = [
+            _parse_reps(s)
+            for s in [row.set1, row.set2, row.set3, row.set4, row.set5]
+            if s
+        ]
+        weight = _parse_weight(row.weight)
+        recent_sessions.append({"date": d, "reps": set_reps, "weight": weight})
+
+    prev = recent_sessions[0]
+    prev_sets = prev["reps"]
+    prev_weight = prev["weight"]
+
+    # Count consecutive sessions at ceiling (all sets >= rep_max)
+    sessions_at_ceiling = 0
+    for sess in recent_sessions:
+        if sess["reps"] and all(r >= rep_max for r in sess["reps"]):
+            sessions_at_ceiling += 1
+        else:
+            break
+
+    # Weight increase: need 2 consecutive sessions at ceiling
+    if sessions_at_ceiling >= 2:
+        suggested_weight = str(prev_weight + 2.5)
+        suggested_target = str(rep_min)
+    else:
+        suggested_weight = str(prev_weight) if prev_weight > 0 else None
+        suggested_target = str(rep_max)
+
+    return {
+        "suggested_weight": suggested_weight,
+        "suggested_target": suggested_target,
+        "prev_sets": prev_sets,
+        "prev_weight": prev_weight,
+        "sessions_at_ceiling": sessions_at_ceiling,
+    }
+
+
 def get_streak_data() -> StreakData:
     """Compute workout streak data from history."""
     history = get_all_history()

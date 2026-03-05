@@ -40,6 +40,23 @@ app.add_middleware(
 )
 
 
+def _enrich_with_progression(session: WorkoutSession):
+    """Add double-progression suggestions to each exercise in the session."""
+    all_history = history.get_all_history()
+    for ex in session.exercises:
+        rep_max = int(ex.target) if ex.target else (int(ex.reps) if ex.reps else 10)
+        rep_min = int(ex.reps) if ex.reps else rep_max
+        if rep_min == rep_max:
+            rep_min = max(1, rep_max - 2)
+        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history)
+        if result:
+            ex.suggested_weight = result["suggested_weight"]
+            ex.suggested_target = result["suggested_target"]
+            ex.prev_sets = result["prev_sets"]
+            ex.prev_weight = result["prev_weight"]
+            ex.sessions_at_ceiling = result["sessions_at_ceiling"]
+
+
 @app.get("/api/tabs", response_model=TabsResponse)
 async def get_tabs():
     """Get all workout tabs grouped by type, with the latest for each."""
@@ -106,6 +123,7 @@ async def get_workout_by_type(workout_type: str):
             raise HTTPException(status_code=404, detail=f"No tabs found for type: {wtype}")
         rows = sheets_client.fetch_tab(tab_name)
         session = parser.parse_tab(tab_name, rows)
+        _enrich_with_progression(session)
     except HTTPException:
         raise
     except Exception as e:
@@ -119,6 +137,7 @@ async def get_workout_by_tab(tab_name: str):
     try:
         rows = sheets_client.fetch_tab(tab_name)
         session = parser.parse_tab(tab_name, rows)
+        _enrich_with_progression(session)
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e))
     return session

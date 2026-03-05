@@ -13,6 +13,11 @@ class Exercise(BaseModel):
     notes_col: int | None = None  # column index for notes write-back
     sheet_row: int  # 0-indexed row in the sheet for write-back
     superset_group: int  # exercises with same group number form a superset
+    suggested_weight: str | None = None
+    suggested_target: str | None = None
+    prev_sets: list[int] | None = None
+    prev_weight: float | None = None
+    sessions_at_ceiling: int | None = None  # 0, 1, or 2
 
 
 class WorkoutSession(BaseModel):
