@@ -1,4 +1,8 @@
+import os
+
 from models import Exercise, WorkoutSession
+
+BODYWEIGHT_KG = int(os.environ.get("BODYWEIGHT_KG", "85"))
 
 
 def _safe_get(row: list[str], idx: int) -> str:
@@ -89,11 +93,16 @@ def parse_tab(tab_name: str, rows: list[list[str]]) -> WorkoutSession:
             current_group += 1
         last_was_blank = False
 
+        raw_weight = _safe_get(row, weight_col)
+        # Substitute bodyweight for exercises logged at 0 or blank
+        if not raw_weight or raw_weight.strip("kg").strip("lbs").strip() in ("0", ""):
+            raw_weight = f"{BODYWEIGHT_KG}kg"
+
         exercise = Exercise(
             name=name,
             reps=_safe_get(row, reps_col),
             sets=_safe_get(row, sets_col),
-            weight=_safe_get(row, weight_col),
+            weight=raw_weight,
             target=_safe_get(row, target_col),
             set_results=[_safe_get(row, c) for c in set_cols],
             rest_times=[_safe_get(row, c) for c in rest_cols],
