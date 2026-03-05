@@ -303,7 +303,7 @@ export default function TodayWorkout() {
           }`}
           aria-pressed={isDeload}
         >
-          {isDeload ? "Deload Active" : "Deload Week"}
+          {isDeload ? "Deload Active" : "Deload"}
         </button>
       </div>
 
