@@ -50,14 +50,18 @@ app.add_middleware(
 
 
 def _parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
-    """Parse target/reps into (rep_min, rep_max), handling ranges and AMRAP."""
-    for val in (target, reps):
-        if not val or val.upper() == "AMRAP":
-            continue
-        if "-" in val:
-            lo, hi = val.split("-", 1)
+    """Parse reps into (rep_min, rep_max). Target is a session hint, not the range."""
+    if reps and reps.upper() != "AMRAP":
+        if "-" in reps:
+            lo, hi = reps.split("-", 1)
             return int(lo), int(hi)
-        n = int(val)
+        n = int(reps)
+        return max(1, n - 2), n
+    if target and target.upper() != "AMRAP":
+        if "-" in target:
+            lo, hi = target.split("-", 1)
+            return int(lo), int(hi)
+        n = int(target)
         return max(1, n - 2), n
     return 8, 12  # sensible default for AMRAP / missing data
 
