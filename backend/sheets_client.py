@@ -94,7 +94,7 @@ def append_rows(tab_name: str, rows: list[list[str]]):
     service.spreadsheets().values().append(
         spreadsheetId=SPREADSHEET_ID,
         range=f"'{tab_name}'!A1",
-        valueInputOption="USER_ENTERED",
+        valueInputOption="RAW",
         insertDataOption="INSERT_ROWS",
         body={"values": rows},
     ).execute()
