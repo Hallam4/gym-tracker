@@ -5,6 +5,8 @@ import { execSync } from "child_process";
 
 function getVersion(): string {
   try {
+    // Render uses shallow clones — unshallow to get real commit count
+    try { execSync("git fetch --unshallow 2>/dev/null"); } catch {}
     const count = execSync("git rev-list --count HEAD").toString().trim();
     return `0.${count}.0`;
   } catch {
