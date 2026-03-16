@@ -1,25 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { execSync } from "child_process";
-
-function getVersion(): string {
-  try {
-    // Deepen shallow clone (Render uses depth=1)
-    try { execSync("git fetch --depth=10000 2>/dev/null"); } catch {}
-    const count = execSync("git rev-list --count HEAD").toString().trim();
-    const n = parseInt(count);
-    if (n > 1) return `0.${n}.0`;
-  } catch {}
-  // Fallback: use commit short hash
-  const sha = process.env.RENDER_GIT_COMMIT
-    || (() => { try { return execSync("git rev-parse --short HEAD").toString().trim(); } catch { return ""; } })();
-  return sha ? `0.0.0-${sha.slice(0, 7)}` : "0.0.0";
-}
+import ver from "./version.json";
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(getVersion()),
+    __APP_VERSION__: JSON.stringify(ver.version),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [
