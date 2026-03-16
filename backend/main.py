@@ -51,19 +51,18 @@ app.add_middleware(
 
 def _parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
     """Parse reps into (rep_min, rep_max). Target is a session hint, not the range."""
-    if reps and reps.upper() != "AMRAP":
-        if "-" in reps:
-            lo, hi = reps.split("-", 1)
-            return int(lo), int(hi)
-        n = int(reps)
-        return max(2, n - 2), n
-    if target and target.upper() != "AMRAP":
-        if "-" in target:
-            lo, hi = target.split("-", 1)
-            return int(lo), int(hi)
-        n = int(target)
-        return max(2, n - 2), n
-    return 8, 12  # sensible default for AMRAP / missing data
+    for val in (reps, target):
+        if not val or val.upper() == "AMRAP":
+            continue
+        try:
+            if "-" in val:
+                lo, hi = val.split("-", 1)
+                return int(lo), int(hi)
+            n = int(val)
+            return max(2, n - 2), n
+        except ValueError:
+            continue
+    return 8, 12  # sensible default for AMRAP / non-numeric / missing data
 
 
 def _enrich_with_progression(session: WorkoutSession):
