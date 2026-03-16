@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { WorkoutSummaryResponse, ExerciseSummary } from "../api/gym";
+import { analyzeTimings, formatDurationShort } from "../utils/timing";
 
 interface Props {
   data: WorkoutSummaryResponse;
   totalSets: number;
   duration: number; // seconds
+  setTimesMap?: Record<string, (number | null)[]>;
   onDismiss: () => void;
 }
 
@@ -57,8 +59,13 @@ function ExerciseRow({ ex }: { ex: ExerciseSummary }) {
   );
 }
 
-export default function WorkoutSummary({ data, totalSets, duration, onDismiss }: Props) {
+export default function WorkoutSummary({ data, totalSets, duration, setTimesMap, onDismiss }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const timing = useMemo(
+    () => setTimesMap && duration > 0 ? analyzeTimings(setTimesMap, duration) : null,
+    [setTimesMap, duration]
+  );
+  const hasBreaks = timing && timing.breaks.length > 0;
 
   // Focus trap and keyboard handling
   useEffect(() => {
@@ -122,10 +129,35 @@ export default function WorkoutSummary({ data, totalSets, duration, onDismiss }:
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Sets</div>
           </div>
           <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-            <div className="text-lg font-bold text-white">{formatDuration(duration)}</div>
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Duration</div>
+            <div className="text-lg font-bold text-white">
+              {hasBreaks ? formatDurationShort(timing.activeSeconds) : formatDuration(duration)}
+            </div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">
+              {hasBreaks ? "Active" : "Duration"}
+            </div>
+            {hasBreaks && (
+              <div className="text-[10px] text-gray-500 mt-0.5">
+                {formatDurationShort(timing.totalSeconds)} total
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Break detection */}
+        {hasBreaks && (
+          <div className="mx-4 mb-4 bg-amber-500/10 rounded-xl p-3 ring-1 ring-amber-500/20">
+            <div className="text-sm font-semibold text-amber-400 mb-1">
+              {timing.breaks.length} Break{timing.breaks.length > 1 ? "s" : ""} Detected
+            </div>
+            <div className="space-y-0.5">
+              {timing.breaks.map((b, i) => (
+                <div key={i} className="text-xs text-amber-400/80">
+                  After {b.exercise} set {b.afterSet} — {formatDurationShort(b.duration)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* PRs highlight */}
         {data.new_prs_count > 0 && (

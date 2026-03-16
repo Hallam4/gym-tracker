@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, HistorySession, HistoryExercise } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
+import { formatDurationShort } from "../utils/timing";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -127,11 +128,39 @@ export default function WorkoutBrowser() {
   );
 }
 
+const BREAK_THRESHOLD = 1500; // 25 minutes
+
 function HistoryDetail({ session }: { session: HistorySession }) {
+  // Compute session-level timing from rest timestamps
+  const sessionTiming = useMemo(() => {
+    const allTimestamps: number[] = [];
+    for (const ex of session.exercises) {
+      for (const val of [ex.rest1, ex.rest2, ex.rest3, ex.rest4]) {
+        const n = parseInt(val);
+        if (!isNaN(n) && n > 0) allTimestamps.push(n);
+      }
+    }
+    if (allTimestamps.length < 2) return null;
+    allTimestamps.sort((a, b) => a - b);
+    const elapsed = allTimestamps[allTimestamps.length - 1] - allTimestamps[0];
+    let breakTotal = 0;
+    for (let i = 1; i < allTimestamps.length; i++) {
+      const delta = allTimestamps[i] - allTimestamps[i - 1];
+      if (delta >= BREAK_THRESHOLD) breakTotal += delta;
+    }
+    if (breakTotal === 0) return null;
+    return { elapsed, active: elapsed - breakTotal, breakTotal };
+  }, [session]);
+
   return (
     <article>
       <div className="text-sm text-gray-400 mb-4">
         {TYPE_LABELS[session.day] || session.day} &mdash; {fmtDate(session.date)}
+        {sessionTiming && (
+          <span className="ml-2 text-xs text-amber-400/80">
+            Duration: {formatDurationShort(sessionTiming.elapsed)} (Active: {formatDurationShort(sessionTiming.active)})
+          </span>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -143,8 +172,29 @@ function HistoryDetail({ session }: { session: HistorySession }) {
   );
 }
 
+function fmtRestDelta(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m >= 25) return `${m}m`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function HistoryExerciseCard({ exercise: ex }: { exercise: HistoryExercise }) {
   const sets = [ex.set1, ex.set2, ex.set3, ex.set4, ex.set5].filter((s) => s);
+  const restTimestamps = [ex.rest1, ex.rest2, ex.rest3, ex.rest4].map((v) => {
+    const n = parseInt(v);
+    return !isNaN(n) && n > 0 ? n : null;
+  });
+
+  // Compute deltas between consecutive rest timestamps
+  const restDeltas: (number | null)[] = [];
+  for (let i = 0; i < restTimestamps.length - 1; i++) {
+    if (restTimestamps[i] != null && restTimestamps[i + 1] != null) {
+      restDeltas.push(restTimestamps[i + 1]! - restTimestamps[i]!);
+    } else {
+      restDeltas.push(null);
+    }
+  }
 
   return (
     <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60 mb-3">
@@ -158,15 +208,27 @@ function HistoryExerciseCard({ exercise: ex }: { exercise: HistoryExercise }) {
         </div>
       </div>
       {sets.length > 0 && (
-        <div className="mt-2 flex gap-2 flex-wrap text-sm" aria-label={`Set results for ${ex.exercise}`}>
+        <div className="mt-2 flex items-center gap-1 flex-wrap text-sm" aria-label={`Set results for ${ex.exercise}`}>
           {sets.map((s, j) => (
-            <span
-              key={j}
-              className="bg-gray-800 px-2 py-1 rounded-md text-gray-300 tabular-nums"
-            >
-              <span className="sr-only">Set {j + 1}:</span>
-              <span aria-hidden="true">S{j + 1}: </span>{s}
-            </span>
+            <div key={j} className="flex items-center gap-1">
+              {j > 0 && restDeltas[j - 1] != null && (
+                <span
+                  className={`text-[10px] font-mono px-1 py-0.5 rounded ${
+                    restDeltas[j - 1]! >= BREAK_THRESHOLD
+                      ? "text-amber-400 bg-amber-900/30"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {restDeltas[j - 1]! >= BREAK_THRESHOLD
+                    ? `Break: ${fmtRestDelta(restDeltas[j - 1]!)}`
+                    : fmtRestDelta(restDeltas[j - 1]!)}
+                </span>
+              )}
+              <span className="bg-gray-800 px-2 py-1 rounded-md text-gray-300 tabular-nums">
+                <span className="sr-only">Set {j + 1}:</span>
+                <span aria-hidden="true">S{j + 1}: </span>{s}
+              </span>
+            </div>
           ))}
         </div>
       )}

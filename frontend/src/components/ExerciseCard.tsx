@@ -21,8 +21,10 @@ interface Props {
   lastGroupSetTime: number | null;
   onSetComplete: (setIndex: number, reps: number) => void;
   onSetUndo?: (setIndex: number) => void;
+  onSetTimeCapture?: (setIndex: number, time: number | null) => void;
   onWeightChange: (weight: string) => void;
   onNotesChange?: (notes: string) => void;
+  initialSetTimes?: (number | null)[];
   onProgressChange?: (done: number, total: number) => void;
   hideSetInfo?: boolean;
   className?: string;
@@ -39,8 +41,10 @@ export default function ExerciseCard({
   lastGroupSetTime,
   onSetComplete,
   onSetUndo,
+  onSetTimeCapture,
   onWeightChange,
   onNotesChange,
+  initialSetTimes,
   onProgressChange,
   hideSetInfo,
   className = "mb-3",
@@ -61,7 +65,7 @@ export default function ExerciseCard({
     return parsed;
   });
   const [setTimes, setSetTimes] = useState<(number | null)[]>(() =>
-    Array.from({ length: MAX_SETS }, () => null)
+    initialSetTimes ?? Array.from({ length: MAX_SETS }, () => null)
   );
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -121,10 +125,12 @@ export default function ExerciseCard({
         newTimes[setIndex] = null;
         setJustCompleted(null);
         onSetUndo?.(setIndex);
+        onSetTimeCapture?.(setIndex, null);
       } else {
         newSets[setIndex] = targetReps;
         newTimes[setIndex] = timerSeconds;
         onSetComplete(setIndex, targetReps);
+        onSetTimeCapture?.(setIndex, timerSeconds);
         setJustCompleted(setIndex);
         if (popTimerRef.current) clearTimeout(popTimerRef.current);
         popTimerRef.current = setTimeout(() => setJustCompleted(null), 300);
@@ -132,7 +138,7 @@ export default function ExerciseCard({
       setCompletedSets(newSets);
       setSetTimes(newTimes);
     },
-    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete]
+    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete, onSetTimeCapture]
   );
 
   const handleRepsAdjust = useCallback(
@@ -146,8 +152,9 @@ export default function ExerciseCard({
       newTimes[setIndex] = timerSeconds;
       setSetTimes(newTimes);
       onSetComplete(setIndex, newReps);
+      onSetTimeCapture?.(setIndex, timerSeconds);
     },
-    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete]
+    [completedSets, setTimes, targetReps, timerSeconds, onSetComplete, onSetTimeCapture]
   );
 
   const handleNotesChange = useCallback(

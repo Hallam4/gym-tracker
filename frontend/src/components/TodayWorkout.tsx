@@ -41,6 +41,7 @@ export default function TodayWorkout() {
     setResults: {},
     weights: {},
     notes: {},
+    setTimes: {},
     timerSeconds: 0,
     timerRunning: false,
   });
@@ -130,6 +131,8 @@ export default function TodayWorkout() {
 
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
+      // Auto-start timer on first set tap
+      if (!timerRunning && timerSeconds === 0) setTimerRunning(true);
       updateSessionState((prev) => {
         const results = { ...prev.setResults };
         const exSets = [...(results[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
@@ -180,6 +183,19 @@ export default function TodayWorkout() {
     [updateSessionState]
   );
 
+  const handleSetTimeCapture = useCallback(
+    (exercise: WorkoutSession["exercises"][0], setIndex: number, time: number | null) => {
+      updateSessionState((prev) => {
+        const times = { ...prev.setTimes };
+        const exTimes = [...(times[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
+        exTimes[setIndex] = time;
+        times[exercise.name] = exTimes;
+        return { ...prev, setTimes: times };
+      });
+    },
+    [updateSessionState]
+  );
+
   const handleSkipToggle = useCallback(
     (exercise: WorkoutSession["exercises"][0]) => {
       setSkippedExercises((prev) => {
@@ -188,11 +204,13 @@ export default function TodayWorkout() {
           next.delete(exercise.sheet_row);
         } else {
           next.add(exercise.sheet_row);
-          // Clear set results for this exercise
+          // Clear set results and times for this exercise
           updateSessionState((prev) => {
             const results = { ...prev.setResults };
+            const times = { ...prev.setTimes };
             delete results[exercise.name];
-            return { ...prev, setResults: results };
+            delete times[exercise.name];
+            return { ...prev, setResults: results, setTimes: times };
           });
         }
         return next;
@@ -395,6 +413,8 @@ export default function TodayWorkout() {
                 lastGroupSetTime={groupLastSetTime.get(ex.superset_group) ?? null}
                 onSetComplete={(setIdx, reps) => handleSetComplete(ex, setIdx, reps)}
                 onSetUndo={(setIdx) => handleSetUndo(ex, setIdx)}
+                onSetTimeCapture={(setIdx, time) => handleSetTimeCapture(ex, setIdx, time)}
+                initialSetTimes={sessionState.setTimes[ex.name]}
                 onWeightChange={(w) => handleWeightChange(ex, w)}
                 onNotesChange={(notes) => handleNotesChange(ex, notes)}
                 onProgressChange={(done, total) =>
@@ -448,7 +468,9 @@ export default function TodayWorkout() {
                 reps: ex.reps,
                 target: ex.target,
                 set_results: ex.set_results,
-                rest_times: ex.rest_times,
+                rest_times: (sessionState.setTimes[ex.name] || [])
+                  .slice(0, 4)
+                  .map((t) => (t !== null ? String(t) : "")),
                 notes: ex.notes,
               }));
             completeMutation.mutate({
@@ -475,6 +497,7 @@ export default function TodayWorkout() {
           data={summaryData}
           totalSets={doneSets}
           duration={timerSeconds}
+          setTimesMap={sessionState.setTimes}
           onDismiss={() => {
             setSummaryData(null);
             queryClient.invalidateQueries({ queryKey: ["workout-structure", selectedType] });

@@ -4,6 +4,7 @@ export interface SessionState {
   setResults: Record<string, (number | null)[]>; // keyed by exercise name
   weights: Record<string, string>;
   notes: Record<string, string>;
+  setTimes: Record<string, (number | null)[]>; // timer timestamps per set
   timerSeconds: number;
   timerRunning: boolean;
 }
@@ -12,6 +13,7 @@ const EMPTY_STATE: SessionState = {
   setResults: {},
   weights: {},
   notes: {},
+  setTimes: {},
   timerSeconds: 0,
   timerRunning: false,
 };
