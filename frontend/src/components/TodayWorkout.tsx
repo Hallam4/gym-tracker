@@ -58,6 +58,32 @@ export default function TodayWorkout() {
     };
   }, [timerRunning]);
 
+  // Keep screen on during active workout
+  useEffect(() => {
+    if (!timerRunning) return;
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const request = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
+        }
+      } catch { /* low battery or unsupported — ignore */ }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") request();
+    };
+
+    request();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      wakeLock?.release();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [timerRunning]);
+
   const { data: session, isLoading, error } = useQuery({
     queryKey: ["workout-structure", selectedType],
     queryFn: () => api.getStructure(selectedType),
