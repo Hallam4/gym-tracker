@@ -324,7 +324,7 @@ def compute_double_progression(
     # Weight increase: need 2 consecutive working sessions at ceiling
     # Base weight on most recent working session, not deload
     base_weight = working_sessions[0]["weight"]
-    if sessions_at_ceiling >= 2:
+    if sessions_at_ceiling >= 1:
         suggested_weight = str(base_weight + 2.5)
         suggested_target = str(rep_min)
     else:

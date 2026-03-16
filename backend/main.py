@@ -149,7 +149,7 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
         for struct_ex in structure_exercises:
             rep_min, rep_max = _parse_rep_range(struct_ex.target, struct_ex.reps)
             result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history)
-            if result and result["sessions_at_ceiling"] >= 2:
+            if result and result["sessions_at_ceiling"] >= 1:
                 if result["suggested_weight"]:
                     # Weight column = col_map["weight"] from Structure header
                     header = rows[0]
