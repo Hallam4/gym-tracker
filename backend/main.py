@@ -56,13 +56,13 @@ def _parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
             lo, hi = reps.split("-", 1)
             return int(lo), int(hi)
         n = int(reps)
-        return max(1, n - 2), n
+        return max(2, n - 2), n
     if target and target.upper() != "AMRAP":
         if "-" in target:
             lo, hi = target.split("-", 1)
             return int(lo), int(hi)
         n = int(target)
-        return max(1, n - 2), n
+        return max(2, n - 2), n
     return 8, 12  # sensible default for AMRAP / missing data
 
 
