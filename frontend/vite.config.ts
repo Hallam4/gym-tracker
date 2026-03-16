@@ -5,13 +5,16 @@ import { execSync } from "child_process";
 
 function getVersion(): string {
   try {
-    // Render uses shallow clones — unshallow to get real commit count
-    try { execSync("git fetch --unshallow 2>/dev/null"); } catch {}
+    // Deepen shallow clone (Render uses depth=1)
+    try { execSync("git fetch --depth=10000 2>/dev/null"); } catch {}
     const count = execSync("git rev-list --count HEAD").toString().trim();
-    return `0.${count}.0`;
-  } catch {
-    return "0.0.0";
-  }
+    const n = parseInt(count);
+    if (n > 1) return `0.${n}.0`;
+  } catch {}
+  // Fallback: use commit short hash
+  const sha = process.env.RENDER_GIT_COMMIT
+    || (() => { try { return execSync("git rev-parse --short HEAD").toString().trim(); } catch { return ""; } })();
+  return sha ? `0.0.0-${sha.slice(0, 7)}` : "0.0.0";
 }
 
 export default defineConfig({
