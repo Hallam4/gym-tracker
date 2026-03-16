@@ -67,7 +67,8 @@ export default function ExerciseCard({
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
-  const targetReps = parseInt(exercise.suggested_target ?? "") || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
+  const usingSuggestedWeight = exercise.suggested_weight != null && localWeight === exercise.suggested_weight;
+  const targetReps = (usingSuggestedWeight ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
