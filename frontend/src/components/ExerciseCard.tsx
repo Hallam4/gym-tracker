@@ -68,6 +68,7 @@ export default function ExerciseCard({
     initialSetTimes ?? Array.from({ length: MAX_SETS }, () => null)
   );
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
+  const [activeSetIndex, setActiveSetIndex] = useState<number | null>(null);
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
@@ -124,6 +125,7 @@ export default function ExerciseCard({
         newSets[setIndex] = null;
         newTimes[setIndex] = null;
         setJustCompleted(null);
+        setActiveSetIndex(null);
         onSetUndo?.(setIndex);
         onSetTimeCapture?.(setIndex, null);
       } else {
@@ -132,6 +134,7 @@ export default function ExerciseCard({
         onSetComplete(setIndex, targetReps);
         onSetTimeCapture?.(setIndex, timerSeconds);
         setJustCompleted(setIndex);
+        setActiveSetIndex(setIndex);
         if (popTimerRef.current) clearTimeout(popTimerRef.current);
         popTimerRef.current = setTimeout(() => setJustCompleted(null), 300);
       }
@@ -383,7 +386,7 @@ export default function ExerciseCard({
                       {prevRep}
                     </div>
                   )}
-                  {isDone && (
+                  {isDone && activeSetIndex === i && (
                     <div className="flex justify-center gap-1 mt-0.5">
                       <button
                         onClick={() => handleRepsAdjust(i, -1)}
