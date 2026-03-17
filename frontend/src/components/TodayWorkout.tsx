@@ -19,6 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const MAX_SETS = 5;
+const REST_DURATION_S = 240; // 4 minutes
 
 export default function TodayWorkout() {
   const [selectedType, setSelectedType] = useState<string>("U1");
@@ -33,7 +34,11 @@ export default function TodayWorkout() {
   const [summaryData, setSummaryData] = useState<WorkoutSummaryResponse | null>(null);
   const [skippedExercises, setSkippedExercises] = useState<Set<number>>(new Set());
   const [isDeload, setIsDeload] = useState(false);
+  const [restTimerEnd, setRestTimerEnd] = useState<number | null>(null);
+  const [restCountdown, setRestCountdown] = useState<number | null>(null);
+  const [restTimerDone, setRestTimerDone] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const restDoneTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const queryClient = useQueryClient();
 
   // Session state stored in localStorage
@@ -85,6 +90,51 @@ export default function TodayWorkout() {
     };
   }, [timerRunning]);
 
+  // Rest timer countdown
+  useEffect(() => {
+    if (!restTimerEnd) {
+      setRestCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((restTimerEnd - Date.now()) / 1000));
+      setRestCountdown(remaining);
+      if (remaining <= 0 && !restTimerDone) {
+        setRestTimerDone(true);
+        try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
+        try {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          gain.gain.value = 0.15;
+          osc.start();
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+          osc.stop(ctx.currentTime + 0.5);
+          setTimeout(() => ctx.close(), 1000);
+        } catch {}
+        if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+        restDoneTimerRef.current = setTimeout(() => {
+          setRestTimerEnd(null);
+          setRestCountdown(null);
+          setRestTimerDone(false);
+        }, 5000);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [restTimerEnd, restTimerDone]);
+
+  // Clean up rest done timer on unmount
+  useEffect(() => {
+    return () => {
+      if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+    };
+  }, []);
+
   const { data: session, isLoading, error } = useQuery({
     queryKey: ["workout-structure", selectedType],
     queryFn: () => api.getStructure(selectedType),
@@ -96,14 +146,20 @@ export default function TodayWorkout() {
     setSessionState(saved);
     setTimerSeconds(saved.timerSeconds);
     setTimerRunning(saved.timerRunning);
+    if (saved.restTimerEnd && saved.restTimerEnd > Date.now()) {
+      setRestTimerEnd(saved.restTimerEnd);
+      setRestTimerDone(false);
+    } else {
+      setRestTimerEnd(null);
+    }
     initializedRef.current = true;
   }, [selectedType, loadState]);
 
   // Persist session state on changes (debounced via hook)
   useEffect(() => {
     if (!initializedRef.current) return;
-    saveState({ ...sessionState, timerSeconds, timerRunning });
-  }, [sessionState, timerSeconds, timerRunning, saveState]);
+    saveState({ ...sessionState, timerSeconds, timerRunning, restTimerEnd });
+  }, [sessionState, timerSeconds, timerRunning, restTimerEnd, saveState]);
 
   // Reset progress map when session changes
   useEffect(() => {
@@ -146,8 +202,26 @@ export default function TodayWorkout() {
         next.set(exercise.superset_group, timerSeconds);
         return next;
       });
+      // Start rest timer (superset-aware)
+      const groupExs = session?.exercises.filter(
+        (ex) => ex.superset_group === exercise.superset_group
+      ) ?? [];
+      let shouldStartRest = true;
+      if (groupExs.length > 1) {
+        // Superset: only start rest when all exercises in group have this set done
+        shouldStartRest = groupExs.every((ex) => {
+          if (ex.name === exercise.name) return true; // just completed now
+          const sets = sessionState.setResults[ex.name];
+          return sets != null && sets[setIndex] != null;
+        });
+      }
+      if (shouldStartRest) {
+        setRestTimerEnd(Date.now() + REST_DURATION_S * 1000);
+        setRestTimerDone(false);
+        if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+      }
     },
-    [timerSeconds, updateSessionState]
+    [timerSeconds, updateSessionState, session?.exercises, sessionState.setResults]
   );
 
   const handleSetUndo = useCallback(
@@ -309,7 +383,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setSelectedType(t); }}
+            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setSelectedType(t); }}
             aria-pressed={selectedType === t}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
               selectedType === t
@@ -341,18 +415,36 @@ export default function TodayWorkout() {
           </span>
         </button>
         <button
-          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); setGroupLastSetTime(new Map()); }}
+          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); setGroupLastSetTime(new Map()); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); }}
           className="text-gray-400 text-lg bg-gray-800/50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-700/50 hover:text-gray-300 active:scale-90 active:bg-gray-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
           aria-label="Reset stopwatch"
         >
           <span aria-hidden="true">&#8634;</span>
         </button>
       </div>
-      {lastSetTime != null && (
+      {restTimerEnd ? (
+        <div
+          className={`text-center -mt-2 mb-3 py-3 rounded-xl transition-all duration-300 ${
+            restTimerDone ? "bg-green-600/20 rest-done-flash" : ""
+          }`}
+          role="timer"
+          aria-label={restTimerDone ? "Rest complete" : `Rest timer: ${restCountdown} seconds remaining`}
+          aria-live="assertive"
+        >
+          {restTimerDone ? (
+            <div className="text-3xl font-bold text-green-400">GO</div>
+          ) : (
+            <div className="text-3xl font-mono font-bold text-white tabular-nums">
+              {Math.floor((restCountdown ?? 0) / 60)}:{((restCountdown ?? 0) % 60).toString().padStart(2, "0")}
+            </div>
+          )}
+          <div className="text-xs text-gray-400 mt-0.5">rest</div>
+        </div>
+      ) : lastSetTime != null ? (
         <div className="text-center text-xs font-mono text-gray-400 -mt-2 mb-3" aria-live="polite">
           Last set @ {Math.floor(lastSetTime / 60)}:{(lastSetTime % 60).toString().padStart(2, "0")}
         </div>
-      )}
+      ) : null}
 
       {/* Deload toggle */}
       <div className="flex justify-center mb-4">
@@ -511,6 +603,9 @@ export default function TodayWorkout() {
             setGroupLastSetTime(new Map());
             setSkippedExercises(new Set());
             setIsDeload(false);
+            setRestTimerEnd(null);
+            setRestCountdown(null);
+            setRestTimerDone(false);
           }}
         />
       )}

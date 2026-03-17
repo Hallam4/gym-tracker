@@ -7,6 +7,7 @@ export interface SessionState {
   setTimes: Record<string, (number | null)[]>; // timer timestamps per set
   timerSeconds: number;
   timerRunning: boolean;
+  restTimerEnd?: number | null; // absolute timestamp (ms) when rest countdown expires
 }
 
 const EMPTY_STATE: SessionState = {
