@@ -35,6 +35,8 @@ export default function TodayWorkout() {
   const [isDeload, setIsDeload] = useState(false);
   const [headerExpanded, setHeaderExpanded] = useState(false);
   const [pendingTypeSwitch, setPendingTypeSwitch] = useState<string | null>(null);
+  const [resetConfirmVisible, setResetConfirmVisible] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const [restTimerEnd, setRestTimerEnd] = useState<number | null>(null);
   const [restCountdown, setRestCountdown] = useState<number | null>(null);
   const [restTimerDone, setRestTimerDone] = useState(false);
@@ -191,6 +193,25 @@ export default function TodayWorkout() {
   const switchToType = useCallback((t: string) => {
     setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setPendingTypeSwitch(null); setSelectedType(t);
   }, []);
+
+  const handleWorkoutReset = useCallback(() => {
+    clearState();
+    setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false });
+    setTimerSeconds(0);
+    setTimerRunning(false);
+    setGroupLastSetTime(new Map());
+    setSkippedExercises(new Set());
+    setRestTimerEnd(null);
+    setRestCountdown(null);
+    setRestTimerDone(false);
+    setProgressMap(new Map());
+    setExpandedGroups(new Set());
+    setIsDeload(false);
+    setHeaderExpanded(false);
+    setResetConfirmVisible(false);
+    setResetKey((k) => k + 1);
+    if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+  }, [clearState]);
 
   const handleTimerLongPressStart = useCallback(() => {
     longPressFiredRef.current = false;
@@ -428,12 +449,20 @@ export default function TodayWorkout() {
                   {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
                 </div>
                 {workoutStarted && (
-                  <button
-                    onClick={() => setHeaderExpanded(false)}
-                    className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1"
-                  >
-                    Collapse
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setResetConfirmVisible(true)}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={() => setHeaderExpanded(false)}
+                      className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1"
+                    >
+                      Collapse
+                    </button>
+                  </div>
                 )}
               </div>
             </>
@@ -544,7 +573,7 @@ export default function TodayWorkout() {
             )}
             {group.exercises.map((ex, i) => (
               <ExerciseCard
-                key={`${selectedType}-${group.groupId}-${i}`}
+                key={`${selectedType}-${resetKey}-${group.groupId}-${i}`}
                 exercise={ex}
                 timerSeconds={timerSeconds}
                 lastGroupSetTime={groupLastSetTime.get(ex.superset_group) ?? null}
@@ -586,6 +615,16 @@ export default function TodayWorkout() {
             ? "Saved!"
             : "Complete Workout"}
       </button>
+
+      {/* Reset workout confirmation */}
+      {resetConfirmVisible && (
+        <ConfirmModal
+          title="Reset workout?"
+          summary="This will clear all logged sets, weights, notes, and the timer for this session. This cannot be undone."
+          onCancel={() => setResetConfirmVisible(false)}
+          onConfirm={handleWorkoutReset}
+        />
+      )}
 
       {/* Type switch confirmation */}
       {pendingTypeSwitch && (
