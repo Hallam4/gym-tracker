@@ -27,7 +27,6 @@ export default function TodayWorkout() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [lastSetTime, setLastSetTime] = useState<number | null>(null);
   const [groupLastSetTime, setGroupLastSetTime] = useState<Map<number, number>>(new Map());
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
@@ -39,6 +38,8 @@ export default function TodayWorkout() {
   const [restTimerDone, setRestTimerDone] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const restDoneTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const longPressRef = useRef<ReturnType<typeof setTimeout>>();
+  const longPressFiredRef = useRef(false);
   const queryClient = useQueryClient();
 
   // Session state stored in localStorage
@@ -185,6 +186,22 @@ export default function TodayWorkout() {
     });
   }, []);
 
+  const handleTimerLongPressStart = useCallback(() => {
+    longPressFiredRef.current = false;
+    longPressRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setRestTimerEnd(null);
+      setRestCountdown(null);
+      setRestTimerDone(false);
+      if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+      try { navigator.vibrate?.(50); } catch {}
+    }, 500);
+  }, []);
+
+  const handleTimerLongPressEnd = useCallback(() => {
+    if (longPressRef.current) clearTimeout(longPressRef.current);
+  }, []);
+
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
       // Auto-start timer on first set tap
@@ -196,7 +213,7 @@ export default function TodayWorkout() {
         results[exercise.name] = exSets;
         return { ...prev, setResults: results };
       });
-      setLastSetTime(timerSeconds);
+
       setGroupLastSetTime((prev) => {
         const next = new Map(prev);
         next.set(exercise.superset_group, timerSeconds);
@@ -383,7 +400,7 @@ export default function TodayWorkout() {
         {TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setLastSetTime(null); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setSelectedType(t); }}
+            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setSelectedType(t); }}
             aria-pressed={selectedType === t}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
               selectedType === t
@@ -403,48 +420,43 @@ export default function TodayWorkout() {
         </div>
       </div>
 
-      {/* Stopwatch */}
-      <div className="flex items-center justify-center gap-2 mb-4" role="timer" aria-label="Workout stopwatch">
+      {/* Unified timer display — long-press to reset rest timer */}
+      <div className="flex items-center justify-center mb-4">
         <button
-          onClick={() => setTimerRunning((r) => !r)}
-          aria-label={timerRunning ? "Pause stopwatch" : "Start stopwatch"}
-          className="bg-gray-800/70 rounded-xl px-4 py-2 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
-        >
-          <span className="text-xl font-mono text-white tabular-nums" aria-live="off">
-            {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
-          </span>
-        </button>
-        <button
-          onClick={() => { setTimerRunning(false); setTimerSeconds(0); setLastSetTime(null); setGroupLastSetTime(new Map()); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); }}
-          className="text-gray-400 text-lg bg-gray-800/50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-700/50 hover:text-gray-300 active:scale-90 active:bg-gray-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
-          aria-label="Reset stopwatch"
-        >
-          <span aria-hidden="true">&#8634;</span>
-        </button>
-      </div>
-      {restTimerEnd ? (
-        <div
-          className={`text-center -mt-2 mb-3 py-3 rounded-xl transition-all duration-300 ${
+          onClick={() => { if (!longPressFiredRef.current) setTimerRunning((r) => !r); }}
+          onTouchStart={handleTimerLongPressStart}
+          onTouchEnd={handleTimerLongPressEnd}
+          onMouseDown={handleTimerLongPressStart}
+          onMouseUp={handleTimerLongPressEnd}
+          onMouseLeave={handleTimerLongPressEnd}
+          aria-label={restTimerEnd
+            ? (restTimerDone ? "Rest complete. Long-press to dismiss." : `Rest: ${restCountdown} seconds. Tap to ${timerRunning ? "pause" : "resume"} stopwatch. Long-press to reset rest timer.`)
+            : (timerRunning ? "Pause stopwatch" : "Start stopwatch")}
+          className={`bg-gray-800/70 rounded-xl px-6 py-3 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
             restTimerDone ? "bg-green-600/20 rest-done-flash" : ""
           }`}
           role="timer"
-          aria-label={restTimerDone ? "Rest complete" : `Rest timer: ${restCountdown} seconds remaining`}
-          aria-live="assertive"
         >
-          {restTimerDone ? (
-            <div className="text-3xl font-bold text-green-400">GO</div>
-          ) : (
-            <div className="text-3xl font-mono font-bold text-white tabular-nums">
-              {Math.floor((restCountdown ?? 0) / 60)}:{((restCountdown ?? 0) % 60).toString().padStart(2, "0")}
+          {restTimerEnd ? (
+            <div className="text-center">
+              {restTimerDone ? (
+                <div className="text-2xl font-bold text-green-400" aria-live="assertive">GO</div>
+              ) : (
+                <div className="text-2xl font-mono font-bold text-white tabular-nums" aria-live="assertive">
+                  {Math.floor((restCountdown ?? 0) / 60)}:{((restCountdown ?? 0) % 60).toString().padStart(2, "0")}
+                </div>
+              )}
+              <div className="text-xs font-mono text-gray-400 mt-1" aria-live="off">
+                {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
+              </div>
             </div>
+          ) : (
+            <span className="text-xl font-mono text-white tabular-nums" aria-live="off">
+              {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
+            </span>
           )}
-          <div className="text-xs text-gray-400 mt-0.5">rest</div>
-        </div>
-      ) : lastSetTime != null ? (
-        <div className="text-center text-xs font-mono text-gray-400 -mt-2 mb-3" aria-live="polite">
-          Last set @ {Math.floor(lastSetTime / 60)}:{(lastSetTime % 60).toString().padStart(2, "0")}
-        </div>
-      ) : null}
+        </button>
+      </div>
 
       {/* Deload toggle */}
       <div className="flex justify-center mb-4">
@@ -599,8 +611,7 @@ export default function TodayWorkout() {
             setToast({ message: "Workout saved!", type: "success" });
             setTimerSeconds(0);
             setTimerRunning(false);
-            setLastSetTime(null);
-            setGroupLastSetTime(new Map());
+                       setGroupLastSetTime(new Map());
             setSkippedExercises(new Set());
             setIsDeload(false);
             setRestTimerEnd(null);
