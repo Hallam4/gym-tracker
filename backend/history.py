@@ -267,6 +267,7 @@ def compute_double_progression(
     rep_min: int,
     rep_max: int,
     history_rows: list[HistoryRow],
+    current_target: int | None = None,
 ) -> dict | None:
     """Compute suggested weight/target using double progression with 2-session confirmation.
 
@@ -321,15 +322,22 @@ def compute_double_progression(
         else:
             break
 
-    # Weight increase: need 2 consecutive working sessions at ceiling
+    # Weight increase or target bump via double progression
     # Base weight on most recent working session, not deload
     base_weight = working_sessions[0]["weight"]
+    if current_target is None:
+        current_target = rep_max
     if sessions_at_ceiling >= 1:
         suggested_weight = str(base_weight + 2.5)
         suggested_target = str(rep_min)
     else:
         suggested_weight = str(base_weight) if base_weight > 0 else None
-        suggested_target = str(rep_max)
+        # Check if most recent working session hit current_target on all sets → bump target
+        latest = working_sessions[0]
+        if latest["reps"] and all(r >= current_target for r in latest["reps"]) and current_target < rep_max:
+            suggested_target = str(current_target + 1)
+        else:
+            suggested_target = str(current_target)
 
     return {
         "suggested_weight": suggested_weight,

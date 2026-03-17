@@ -70,7 +70,8 @@ def _enrich_with_progression(session: WorkoutSession):
     all_history = history.get_all_history()
     for ex in session.exercises:
         rep_min, rep_max = _parse_rep_range(ex.target, ex.reps)
-        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history)
+        current_target = int(ex.target) if ex.target and ex.target.isdigit() else rep_max
+        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target)
         if result:
             ex.suggested_weight = result["suggested_weight"]
             ex.suggested_target = result["suggested_target"]
@@ -146,25 +147,26 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
         structure_exercises = by_type.get(req.day, [])
 
         updates = []
+        header = rows[0]
+        weight_col = None
+        target_col = None
+        for j, cell in enumerate(header):
+            key = cell.strip().lower()
+            if key == "weight":
+                weight_col = j
+            elif key == "target":
+                target_col = j
+
         for struct_ex in structure_exercises:
             rep_min, rep_max = _parse_rep_range(struct_ex.target, struct_ex.reps)
-            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history)
-            if result and result["sessions_at_ceiling"] >= 1:
-                if result["suggested_weight"]:
-                    # Weight column = col_map["weight"] from Structure header
-                    header = rows[0]
-                    weight_col = None
-                    target_col = None
-                    for j, cell in enumerate(header):
-                        key = cell.strip().lower()
-                        if key == "weight":
-                            weight_col = j
-                        elif key == "target":
-                            target_col = j
-                    if weight_col is not None:
-                        updates.append({"row": struct_ex.sheet_row, "col": weight_col, "value": f"{result['suggested_weight']}kg"})
-                    if target_col is not None and result["suggested_target"]:
-                        updates.append({"row": struct_ex.sheet_row, "col": target_col, "value": result["suggested_target"]})
+            current_target = int(struct_ex.target) if struct_ex.target and struct_ex.target.isdigit() else rep_max
+            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target)
+            if not result:
+                continue
+            if result["sessions_at_ceiling"] >= 1 and result["suggested_weight"] and weight_col is not None:
+                updates.append({"row": struct_ex.sheet_row, "col": weight_col, "value": f"{result['suggested_weight']}kg"})
+            if target_col is not None and result["suggested_target"]:
+                updates.append({"row": struct_ex.sheet_row, "col": target_col, "value": result["suggested_target"]})
 
         if updates:
             sheets_client.update_structure_cells(updates)
