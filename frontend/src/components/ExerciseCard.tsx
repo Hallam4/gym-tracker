@@ -169,7 +169,7 @@ export default function ExerciseCard({
   );
 
   return (
-    <div className={`bg-gray-900 rounded-2xl p-4 ring-1 ${isDeload && !isSkipped ? "ring-amber-800/40" : "ring-gray-800/60"} ${isSkipped ? "opacity-50" : ""} ${className}`}>
+    <div className={`bg-gray-900 rounded-2xl py-5 px-4 ring-1 ${isDeload && !isSkipped ? "ring-amber-800/40" : "ring-gray-800/60"} ${isSkipped ? "opacity-50" : ""} ${className}`}>
       {/* Exercise header */}
       <div className="flex items-center gap-2">
       {onSkipToggle && (
@@ -227,7 +227,7 @@ export default function ExerciseCard({
                 </div>
               )}
               {lastGroupSetTime != null && (
-                <span className="shrink-0 text-[10px] font-mono text-gray-400" aria-label={`Last set at ${fmtTime(lastGroupSetTime)}`}>
+                <span className="shrink-0 text-[11px] font-mono text-gray-300" aria-label={`Last set at ${fmtTime(lastGroupSetTime)}`}>
                   {fmtTime(lastGroupSetTime)}
                 </span>
               )}
@@ -236,11 +236,11 @@ export default function ExerciseCard({
             {/* Row 2: Target info pills */}
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {!hideSetInfo && (
-                <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                <span className="text-xs bg-gray-800/70 text-gray-300 px-1.5 py-0.5 rounded">
                   {exercise.sets} sets
                 </span>
               )}
-              <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-gray-800/70 text-gray-300 px-1.5 py-0.5 rounded">
                 {exercise.reps} reps
               </span>
               {exercise.target && (
@@ -262,17 +262,17 @@ export default function ExerciseCard({
             {sessionsAtCeiling > 0 && (
               <div className="mt-1">
                 {isWeightIncrease ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
                     <span aria-hidden="true">&#8593;</span>
                     Weight up! Hit target {sessionsAtCeiling}x in a row
                   </span>
                 ) : sessionsAtCeiling >= 2 ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
                     <span aria-hidden="true">&#9733;</span>
                     Hit target {sessionsAtCeiling}x -- ready to go up
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-yellow-400/80 px-2 py-0.5 bg-yellow-900/30 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[13px] text-yellow-400/80 px-2 py-0.5 bg-yellow-900/30 rounded-full">
                     Hit target {sessionsAtCeiling}/2 sessions
                   </span>
                 )}
@@ -303,7 +303,7 @@ export default function ExerciseCard({
             </button>
             <div className="text-center" aria-live="polite">
               <div className="text-2xl font-bold text-white tabular-nums">{localWeight}</div>
-              <div className="text-xs text-gray-400">kg</div>
+              <div className="text-xs text-gray-300">kg</div>
               {/* Show where the suggestion came from */}
               {isWeightIncrease && localWeight === suggestedWeight && (
                 <div className="text-[10px] text-green-400 mt-0.5">
@@ -377,7 +377,7 @@ export default function ExerciseCard({
                     {label}
                   </button>
                   {isDone && setTimes[i] != null && (
-                    <div className="text-[10px] font-mono text-gray-400 mt-0.5" aria-hidden="true">
+                    <div className="text-[11px] font-mono text-gray-300 mt-0.5" aria-hidden="true">
                       {fmtTime(setTimes[i]!)}
                     </div>
                   )}
@@ -391,14 +391,14 @@ export default function ExerciseCard({
                       <button
                         onClick={() => handleRepsAdjust(i, -1)}
                         aria-label={`Decrease reps for set ${i + 1}`}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-400 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         -
                       </button>
                       <button
                         onClick={() => handleRepsAdjust(i, 1)}
                         aria-label={`Increase reps for set ${i + 1}`}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-400 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 active:bg-gray-700 active:scale-90 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         +
                       </button>

@@ -34,6 +34,7 @@ export default function TodayWorkout() {
   const [skippedExercises, setSkippedExercises] = useState<Set<number>>(new Set());
   const [isDeload, setIsDeload] = useState(false);
   const [headerExpanded, setHeaderExpanded] = useState(false);
+  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<string | null>(null);
   const [restTimerEnd, setRestTimerEnd] = useState<number | null>(null);
   const [restCountdown, setRestCountdown] = useState<number | null>(null);
   const [restTimerDone, setRestTimerDone] = useState(false);
@@ -185,6 +186,10 @@ export default function TodayWorkout() {
       const next = updater(prev);
       return next;
     });
+  }, []);
+
+  const switchToType = useCallback((t: string) => {
+    setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setPendingTypeSwitch(null); setSelectedType(t);
   }, []);
 
   const handleTimerLongPressStart = useCallback(() => {
@@ -406,7 +411,7 @@ export default function TodayWorkout() {
                 {TYPES.map((t) => (
                   <button
                     key={t}
-                    onClick={() => { setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setSelectedType(t); }}
+                    onClick={() => { if (t === selectedType) return; if (workoutStarted) { setPendingTypeSwitch(t); } else { switchToType(t); } }}
                     aria-pressed={selectedType === t}
                     className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
                       selectedType === t
@@ -419,7 +424,7 @@ export default function TodayWorkout() {
                 ))}
               </div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-gray-300">
                   {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
                 </div>
                 {workoutStarted && (
@@ -472,7 +477,7 @@ export default function TodayWorkout() {
                   {Math.floor((restCountdown ?? 0) / 60)}:{((restCountdown ?? 0) % 60).toString().padStart(2, "0")}
                 </div>
               )}
-              <div className="text-xs font-mono text-gray-400 mt-1" aria-live="off">
+              <div className="text-xs font-mono text-gray-300 mt-1" aria-live="off">
                 {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
               </div>
             </div>
@@ -519,7 +524,7 @@ export default function TodayWorkout() {
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <span className={`text-xs tabular-nums ${progressPct >= 100 ? "text-green-400" : "text-gray-400"}`} aria-hidden="true">
+          <span className={`text-xs tabular-nums ${progressPct >= 100 ? "text-green-400" : "text-gray-300"}`} aria-hidden="true">
             {doneSets}/{totalSets}
           </span>
         </div>
@@ -532,7 +537,7 @@ export default function TodayWorkout() {
             {group.isSuperset && (
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-semibold text-blue-400">Superset</span>
-                <span className="text-xs bg-gray-800/70 text-gray-400 px-1.5 py-0.5 rounded">
+                <span className="text-xs bg-gray-800/70 text-gray-300 px-1.5 py-0.5 rounded">
                   {group.exercises[0].sets} sets
                 </span>
               </div>
@@ -581,6 +586,16 @@ export default function TodayWorkout() {
             ? "Saved!"
             : "Complete Workout"}
       </button>
+
+      {/* Type switch confirmation */}
+      {pendingTypeSwitch && (
+        <ConfirmModal
+          title={`Switch to ${TYPE_LABELS[pendingTypeSwitch]}?`}
+          summary="Your current workout timer will reset. Logged sets are saved and will restore if you switch back."
+          onCancel={() => setPendingTypeSwitch(null)}
+          onConfirm={() => switchToType(pendingTypeSwitch)}
+        />
+      )}
 
       {/* Confirm modal */}
       {confirmVisible && (
