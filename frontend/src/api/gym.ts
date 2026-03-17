@@ -18,6 +18,9 @@ export interface Exercise {
   prev_sets?: number[] | null;
   prev_weight?: number | null;
   sessions_at_ceiling?: number | null;
+  rep_min?: number | null;
+  rep_max?: number | null;
+  is_amrap?: boolean;
 }
 
 export interface WorkoutSession {

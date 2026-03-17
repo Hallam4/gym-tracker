@@ -18,6 +18,9 @@ class Exercise(BaseModel):
     prev_sets: list[int] | None = None
     prev_weight: float | None = None
     sessions_at_ceiling: int | None = None  # 0, 1, or 2
+    rep_min: int | None = None
+    rep_max: int | None = None
+    is_amrap: bool = False
 
 
 class WorkoutSession(BaseModel):

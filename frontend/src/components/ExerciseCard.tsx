@@ -336,10 +336,20 @@ export default function ExerciseCard({
               if (isDone) {
                 if (isBonus) {
                   btnClass = "bg-blue-800 text-blue-200";
-                } else if (reps! >= targetReps) {
+                } else if (exercise.is_amrap) {
                   btnClass = "bg-green-700 text-white";
                 } else {
-                  btnClass = "bg-amber-700 text-white";
+                  const repMin = exercise.rep_min ?? targetReps;
+                  const repMax = exercise.rep_max ?? targetReps;
+                  if (reps! >= repMax) {
+                    btnClass = "bg-green-700 text-white";
+                  } else if (reps! >= targetReps) {
+                    btnClass = "bg-teal-700 text-white";
+                  } else if (reps! >= repMin) {
+                    btnClass = "bg-amber-600 text-white";
+                  } else {
+                    btnClass = "bg-red-700 text-white";
+                  }
                 }
               } else if (isBonus) {
                 btnClass = "bg-gray-800/50 text-gray-500 border border-dashed border-gray-700";

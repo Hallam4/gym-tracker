@@ -70,6 +70,9 @@ def _enrich_with_progression(session: WorkoutSession):
     all_history = history.get_all_history()
     for ex in session.exercises:
         rep_min, rep_max = _parse_rep_range(ex.target, ex.reps)
+        ex.rep_min = rep_min
+        ex.rep_max = rep_max
+        ex.is_amrap = bool(ex.reps and ex.reps.upper() == "AMRAP") or bool(ex.target and ex.target.upper() == "AMRAP")
         current_target = int(ex.target) if ex.target and ex.target.isdigit() else rep_max
         result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target)
         if result:
