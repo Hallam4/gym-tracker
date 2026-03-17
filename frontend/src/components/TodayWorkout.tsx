@@ -33,6 +33,7 @@ export default function TodayWorkout() {
   const [summaryData, setSummaryData] = useState<WorkoutSummaryResponse | null>(null);
   const [skippedExercises, setSkippedExercises] = useState<Set<number>>(new Set());
   const [isDeload, setIsDeload] = useState(false);
+  const [headerExpanded, setHeaderExpanded] = useState(false);
   const [restTimerEnd, setRestTimerEnd] = useState<number | null>(null);
   const [restCountdown, setRestCountdown] = useState<number | null>(null);
   const [restTimerDone, setRestTimerDone] = useState(false);
@@ -395,30 +396,55 @@ export default function TodayWorkout() {
 
   return (
     <div>
-      {/* Type selector */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-3" role="group" aria-label="Workout type">
-        {TYPES.map((t) => (
+      {/* Header: type selector + workout info + deload — collapses once workout starts */}
+      {(() => {
+        const workoutStarted = timerRunning || timerSeconds > 0 || doneSets > 0;
+        if (!workoutStarted || headerExpanded) {
+          return (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-3 mb-3" role="group" aria-label="Workout type">
+                {TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => { setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setSelectedType(t); }}
+                    aria-pressed={selectedType === t}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
+                      selectedType === t
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                        : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50 hover:bg-gray-700 hover:text-gray-300"
+                    }`}
+                  >
+                    {TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm text-gray-400">
+                  {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
+                </div>
+                {workoutStarted && (
+                  <button
+                    onClick={() => setHeaderExpanded(false)}
+                    className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1"
+                  >
+                    Collapse
+                  </button>
+                )}
+              </div>
+            </>
+          );
+        }
+        return (
           <button
-            key={t}
-            onClick={() => { setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setSelectedType(t); }}
-            aria-pressed={selectedType === t}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap touch-target transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
-              selectedType === t
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50 hover:bg-gray-700 hover:text-gray-300"
-            }`}
+            onClick={() => setHeaderExpanded(true)}
+            className="w-full flex items-center justify-center gap-2 mb-3 py-1.5 rounded-full bg-gray-800/50 ring-1 ring-gray-700/40 active:scale-[0.98] transition-all duration-150"
+            aria-label="Expand workout type selector"
           >
-            {TYPE_LABELS[t]}
+            <span className="text-sm font-medium text-blue-400">{TYPE_LABELS[selectedType]}</span>
+            {isDeload && <span className="text-xs text-amber-400">Deload</span>}
           </button>
-        ))}
-      </div>
-
-      {/* Workout info */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm text-gray-400">
-          {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Unified timer display — long-press to reset rest timer */}
       <div className="flex items-center justify-center mb-4">
@@ -458,20 +484,22 @@ export default function TodayWorkout() {
         </button>
       </div>
 
-      {/* Deload toggle */}
-      <div className="flex justify-center mb-4">
-        <button
-          onClick={() => setIsDeload((d) => !d)}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-            isDeload
-              ? "bg-amber-900/60 text-amber-300 ring-1 ring-amber-700/60"
-              : "bg-gray-800/50 text-gray-500 ring-1 ring-gray-700/40 hover:text-gray-400"
-          }`}
-          aria-pressed={isDeload}
-        >
-          {isDeload ? "Deload Active" : "Deload"}
-        </button>
-      </div>
+      {/* Deload toggle — hidden when header is collapsed */}
+      {(!timerRunning && timerSeconds === 0 && doneSets === 0) || headerExpanded ? (
+        <div className="flex justify-center mb-4">
+          <button
+            onClick={() => setIsDeload((d) => !d)}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              isDeload
+                ? "bg-amber-900/60 text-amber-300 ring-1 ring-amber-700/60"
+                : "bg-gray-800/50 text-gray-500 ring-1 ring-gray-700/40 hover:text-gray-400"
+            }`}
+            aria-pressed={isDeload}
+          >
+            {isDeload ? "Deload Active" : "Deload"}
+          </button>
+        </div>
+      ) : null}
 
       {/* Progress bar */}
       {totalSets > 0 && (
