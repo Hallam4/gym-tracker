@@ -1,5 +1,36 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Component, ErrorInfo, ReactNode } from "react";
 import TodayWorkout from "./components/TodayWorkout";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Component crash:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-center py-12">
+          <div className="text-red-400 font-medium mb-2">Something went wrong</div>
+          <p className="text-sm text-gray-400 mb-4">Try clearing your session data.</p>
+          <button
+            onClick={() => {
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const k = localStorage.key(i);
+                if (k?.startsWith("gym-session-")) localStorage.removeItem(k);
+              }
+              this.setState({ hasError: false });
+            }}
+            className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-sm hover:bg-gray-700 active:scale-95 transition-all duration-150"
+          >
+            Clear &amp; Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import WorkoutBrowser from "./components/WorkoutBrowser";
 import ProgressCharts from "./components/ProgressCharts";
 import PRBoard from "./components/PRBoard";
@@ -139,7 +170,7 @@ export default function App() {
         aria-labelledby={`tab-${tab}`}
       >
         {tab === "home" && <HomeDashboard onNavigate={setTab} />}
-        {tab === "today" && <TodayWorkout />}
+        {tab === "today" && <ErrorBoundary><TodayWorkout /></ErrorBoundary>}
         {tab === "browse" && <WorkoutBrowser />}
         {tab === "progress" && <ProgressCharts />}
         {tab === "prs" && <PRBoard />}

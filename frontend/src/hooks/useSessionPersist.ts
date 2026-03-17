@@ -28,12 +28,36 @@ export function useSessionPersist(type: string) {
   const key = storageKey(type);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Load state (returns empty if stale/missing)
+  // Load state (returns empty if stale/missing/corrupted)
   const loadState = useCallback((): SessionState => {
     try {
       const raw = localStorage.getItem(key);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Validate shape — fall back to empty if corrupted
+        if (
+          typeof parsed !== "object" || parsed === null ||
+          typeof parsed.setResults !== "object" ||
+          typeof parsed.weights !== "object" ||
+          typeof parsed.notes !== "object" ||
+          typeof parsed.setTimes !== "object" ||
+          typeof parsed.timerSeconds !== "number"
+        ) {
+          localStorage.removeItem(key);
+          return { ...EMPTY_STATE };
+        }
+        // Ensure setResults values are arrays
+        for (const k of Object.keys(parsed.setResults)) {
+          if (!Array.isArray(parsed.setResults[k])) {
+            localStorage.removeItem(key);
+            return { ...EMPTY_STATE };
+          }
+        }
+        return parsed;
+      }
+    } catch {
+      localStorage.removeItem(key);
+    }
     return { ...EMPTY_STATE };
   }, [key]);
 
