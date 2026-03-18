@@ -72,8 +72,11 @@ export default function ExerciseCard({
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
-  const usingSuggestedWeight = exercise.suggested_weight != null && parseFloat(localWeight) === parseFloat(exercise.suggested_weight);
-  const targetReps = (usingSuggestedWeight ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
+  // Lock target at mount time so it doesn't change when adjusting weight mid-workout
+  const [targetReps] = useState(() => {
+    const initiallyUsingSuggested = exercise.suggested_weight != null;
+    return (initiallyUsingSuggested ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
+  });
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
   const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
