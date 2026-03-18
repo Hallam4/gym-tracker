@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, Component, ErrorInfo, ReactNode } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
 import TodayWorkout from "./components/TodayWorkout";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -65,6 +66,10 @@ export default function App() {
   const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(loadHiddenTabs);
   const [showSettings, setShowSettings] = useState(false);
   const [workoutActive, setWorkoutActive] = useState(false);
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
 
   // Long-press handler (3s on header)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -247,8 +252,18 @@ export default function App() {
               {new Date(__BUILD_TIME__).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
             </p>
             <button
+              onClick={() => updateServiceWorker(true)}
+              className={`mt-4 w-full py-3 rounded-xl text-sm font-semibold touch-target active:scale-[0.98] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
+                needRefresh
+                  ? "bg-green-600 text-white hover:brightness-110"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              {needRefresh ? "Update available — tap to install" : "Check for updates"}
+            </button>
+            <button
               onClick={() => { setShowSettings(false); settingsTriggerRef.current?.focus(); }}
-              className="mt-6 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold touch-target hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+              className="mt-2 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold touch-target hover:brightness-110 active:scale-[0.98] active:bg-blue-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
             >
               Done
             </button>
