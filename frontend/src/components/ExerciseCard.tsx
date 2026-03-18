@@ -55,7 +55,7 @@ export default function ExerciseCard({
   onSkipToggle,
 }: Props) {
   const [localExpanded, setLocalExpanded] = useState(false);
-  const isExpanded = isSkipped ? false : (controlledExpanded ?? localExpanded);
+  const isExpanded = controlledExpanded ?? localExpanded;
   const toggleExpand = onToggleExpand ?? (() => setLocalExpanded((e) => !e));
   const [localWeight, setLocalWeight] = useState(exercise.suggested_weight ?? exercise.weight);
   const [localNotes, setLocalNotes] = useState(exercise.notes);
@@ -172,20 +172,6 @@ export default function ExerciseCard({
     <div className={`bg-gray-900 rounded-2xl py-5 px-4 ring-1 ${isDeload && !isSkipped ? "ring-amber-800/40" : "ring-gray-800/60"} ${isSkipped ? "opacity-50" : ""} ${className}`}>
       {/* Exercise header */}
       <div className="flex items-center gap-2">
-      {onSkipToggle && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onSkipToggle(); }}
-          className={`shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-all duration-150 min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-            isSkipped
-              ? "bg-amber-900/50 text-amber-400 ring-1 ring-amber-700/50"
-              : "bg-gray-800/50 text-gray-500 hover:text-gray-400 hover:bg-gray-800"
-          }`}
-          aria-label={isSkipped ? `Unskip ${exercise.name}` : `Skip ${exercise.name}`}
-        >
-          {isSkipped ? "Skipped" : "Skip"}
-        </button>
-      )}
       <button
         type="button"
         className="flex items-center justify-between flex-1 min-w-0 cursor-pointer select-none text-left min-h-[44px] active:opacity-80 transition-opacity duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
@@ -250,15 +236,7 @@ export default function ExerciseCard({
               )}
             </div>
 
-            {/* Row 3: Previous session context */}
-            {exercise.prev_sets && exercise.prev_sets.length > 0 && (
-              <div className="text-[11px] text-gray-500 mt-1">
-                Last: {fmtPrevSets(exercise.prev_sets)}
-                {exercise.prev_weight != null && ` @ ${exercise.prev_weight}kg`}
-              </div>
-            )}
-
-            {/* Row 4: Progression signals */}
+            {/* Row 3: Progression signals */}
             {sessionsAtCeiling > 0 && (
               <div className="mt-1">
                 {isWeightIncrease ? (
@@ -291,8 +269,32 @@ export default function ExerciseCard({
         }`}
       >
         <div className="grid-expand-inner">
+          {/* Previous session context + Skip */}
+          <div className="flex items-center justify-between mt-3 mb-3">
+            {exercise.prev_sets && exercise.prev_sets.length > 0 ? (
+              <div className="text-[11px] text-gray-500">
+                Last: {fmtPrevSets(exercise.prev_sets)}
+                {exercise.prev_weight != null && ` @ ${exercise.prev_weight}kg`}
+              </div>
+            ) : <div />}
+            {onSkipToggle && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onSkipToggle(); }}
+                className={`shrink-0 text-xs font-medium px-2 py-1 rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  isSkipped
+                    ? "bg-amber-900/50 text-amber-400 ring-1 ring-amber-700/50"
+                    : "bg-gray-800/50 text-gray-500 hover:text-gray-400 hover:bg-gray-800"
+                }`}
+                aria-label={isSkipped ? `Unskip ${exercise.name}` : `Skip ${exercise.name}`}
+              >
+                {isSkipped ? "Skipped" : "Skip"}
+              </button>
+            )}
+          </div>
+
           {/* Weight adjuster */}
-          <fieldset className="flex items-center justify-center gap-4 mb-4 mt-3 border-0 p-0 m-0">
+          <fieldset className="flex items-center justify-center gap-4 mb-4 border-0 p-0 m-0">
             <legend className="sr-only">Weight for {exercise.name}</legend>
             <button
               onClick={() => adjustWeight(-2.5)}
@@ -302,9 +304,7 @@ export default function ExerciseCard({
               -
             </button>
             <div className="text-center" aria-live="polite">
-              <div className="text-2xl font-bold text-white tabular-nums">{localWeight}</div>
-              <div className="text-xs text-gray-300">kg</div>
-              {/* Show where the suggestion came from */}
+              <div className="text-2xl font-bold text-white tabular-nums">{localWeight} <span className="text-sm font-normal text-gray-300">kg</span></div>
               {isWeightIncrease && localWeight === suggestedWeight && (
                 <div className="text-[10px] text-green-400 mt-0.5">
                   +{(parseFloat(suggestedWeight) - prevWeight).toFixed(1)} suggested
@@ -352,7 +352,7 @@ export default function ExerciseCard({
                   }
                 }
               } else if (isBonus) {
-                btnClass = "bg-gray-800/50 text-gray-500 border border-dashed border-gray-700";
+                btnClass = "bg-gray-800/30 text-gray-600 border border-dashed border-gray-700/50 opacity-60";
               } else {
                 btnClass = "bg-gray-800 text-gray-400";
               }

@@ -440,7 +440,7 @@ export default function TodayWorkout() {
                         : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50 hover:bg-gray-700 hover:text-gray-300"
                     }`}
                   >
-                    {TYPE_LABELS[t]}
+                    {t === "Arm" ? "Arms" : t}
                   </button>
                 ))}
               </div>
@@ -448,22 +448,35 @@ export default function TodayWorkout() {
                 <div className="text-sm text-gray-300">
                   {session.day} {session.date && `\u2014 ${fmtDate(session.date)}`}
                 </div>
-                {workoutStarted && (
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setResetConfirmVisible(true)}
-                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                      onClick={() => setIsDeload((d) => !d)}
+                      className={`text-xs px-2 py-1 rounded-full transition-all duration-200 ${
+                        isDeload
+                          ? "text-amber-300 bg-amber-900/40"
+                          : "text-gray-500 hover:text-gray-400"
+                      }`}
+                      aria-pressed={isDeload}
                     >
-                      Reset
+                      {isDeload ? "Deload On" : "Deload"}
                     </button>
-                    <button
-                      onClick={() => setHeaderExpanded(false)}
-                      className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1"
-                    >
-                      Collapse
-                    </button>
+                    {workoutStarted && (
+                      <>
+                        <button
+                          onClick={() => setResetConfirmVisible(true)}
+                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          onClick={() => setHeaderExpanded(false)}
+                          className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1"
+                        >
+                          Collapse
+                        </button>
+                      </>
+                    )}
                   </div>
-                )}
               </div>
             </>
           );
@@ -474,14 +487,14 @@ export default function TodayWorkout() {
             className="w-full flex items-center justify-center gap-2 mb-3 py-1.5 rounded-full bg-gray-800/50 ring-1 ring-gray-700/40 active:scale-[0.98] transition-all duration-150"
             aria-label="Expand workout type selector"
           >
-            <span className="text-sm font-medium text-blue-400">{TYPE_LABELS[selectedType]}</span>
+            <span className="text-sm font-medium text-blue-400">{selectedType === "Arm" ? "Arms" : selectedType}</span>
             {isDeload && <span className="text-xs text-amber-400">Deload</span>}
           </button>
         );
       })()}
 
-      {/* Unified timer display — long-press to reset rest timer */}
-      <div className="flex items-center justify-center mb-4">
+      {/* Unified timer display — sticky so it's visible during later exercises */}
+      <div className={`flex items-center justify-center mb-3 ${restTimerEnd ? "sticky top-0 z-20 py-2 -mx-4 px-4 bg-gray-950/90 backdrop-blur-sm" : ""}`}>
         <button
           onClick={() => { if (!longPressFiredRef.current) setTimerRunning((r) => !r); }}
           onTouchStart={handleTimerLongPressStart}
@@ -492,7 +505,7 @@ export default function TodayWorkout() {
           aria-label={restTimerEnd
             ? (restTimerDone ? "Rest complete. Long-press to dismiss." : `Rest: ${restCountdown} seconds. Tap to ${timerRunning ? "pause" : "resume"} stopwatch. Long-press to reset rest timer.`)
             : (timerRunning ? "Pause stopwatch" : "Start stopwatch")}
-          className={`bg-gray-800/70 rounded-xl px-6 py-3 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
+          className={`bg-gray-800/70 rounded-xl px-6 py-2 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
             restTimerDone ? "bg-green-600/20 rest-done-flash" : ""
           }`}
           role="timer"
@@ -518,26 +531,9 @@ export default function TodayWorkout() {
         </button>
       </div>
 
-      {/* Deload toggle — hidden when header is collapsed */}
-      {(!timerRunning && timerSeconds === 0 && doneSets === 0) || headerExpanded ? (
-        <div className="flex justify-center mb-4">
-          <button
-            onClick={() => setIsDeload((d) => !d)}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-              isDeload
-                ? "bg-amber-900/60 text-amber-300 ring-1 ring-amber-700/60"
-                : "bg-gray-800/50 text-gray-500 ring-1 ring-gray-700/40 hover:text-gray-400"
-            }`}
-            aria-pressed={isDeload}
-          >
-            {isDeload ? "Deload Active" : "Deload"}
-          </button>
-        </div>
-      ) : null}
-
       {/* Progress bar */}
       {totalSets > 0 && (
-        <div className="flex items-center gap-2 mb-5">
+        <div className="flex items-center gap-2 mb-3">
           <div
             className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden"
             role="progressbar"
@@ -554,7 +550,7 @@ export default function TodayWorkout() {
             />
           </div>
           <span className={`text-xs tabular-nums ${progressPct >= 100 ? "text-green-400" : "text-gray-300"}`} aria-hidden="true">
-            {doneSets}/{totalSets}
+            {doneSets}/{totalSets}{progressPct > 0 && progressPct < 100 ? ` (${Math.round(progressPct)}%)` : ""}
           </span>
         </div>
       )}
@@ -564,7 +560,7 @@ export default function TodayWorkout() {
         {groupExercises(mergedExercises).map((group) => (
           <div key={group.groupId} className={group.isSuperset ? "border-l-2 border-blue-500/70 pl-3 mb-3" : ""}>
             {group.isSuperset && (
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 sticky top-0 z-10 -ml-3 pl-3 py-1 bg-gray-950/80 backdrop-blur-sm rounded-r-lg">
                 <span className="text-xs font-semibold text-blue-400">Superset</span>
                 <span className="text-xs bg-gray-800/70 text-gray-300 px-1.5 py-0.5 rounded">
                   {group.exercises[0].sets} sets
