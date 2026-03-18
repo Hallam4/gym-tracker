@@ -601,11 +601,15 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
                   {group.exercises[0].sets} sets
                 </span>
                 <button
+                  type="button"
                   onClick={() => handleSupersetSkipToggle(group.exercises)}
-                  className={`ml-auto text-xs font-medium px-2 py-1 rounded-lg transition-all duration-150 ${
+                  aria-label={group.exercises.every((ex) => skippedExercises.has(ex.sheet_row))
+                    ? "Unskip all exercises in this superset"
+                    : "Skip all exercises in this superset"}
+                  className={`ml-auto text-xs font-medium px-2 py-2.5 rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                     group.exercises.every((ex) => skippedExercises.has(ex.sheet_row))
-                      ? "bg-amber-900/50 text-amber-400"
-                      : "bg-gray-800/50 text-gray-500 hover:text-gray-400"
+                      ? "bg-amber-900/50 text-amber-400 ring-1 ring-amber-700/50"
+                      : "bg-gray-800/50 text-gray-500 hover:text-gray-400 hover:bg-gray-800"
                   }`}
                 >
                   {group.exercises.every((ex) => skippedExercises.has(ex.sheet_row))
