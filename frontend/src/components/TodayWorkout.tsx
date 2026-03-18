@@ -337,6 +337,35 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     [updateSessionState]
   );
 
+  const handleSupersetSkipToggle = useCallback(
+    (exercises: WorkoutSession["exercises"]) => {
+      const allSkipped = exercises.every((ex) => skippedExercises.has(ex.sheet_row));
+      setSkippedExercises((prev) => {
+        const next = new Set(prev);
+        for (const ex of exercises) {
+          if (allSkipped) {
+            next.delete(ex.sheet_row);
+          } else {
+            next.add(ex.sheet_row);
+          }
+        }
+        return next;
+      });
+      if (!allSkipped) {
+        updateSessionState((prev) => {
+          const results = { ...prev.setResults };
+          const times = { ...prev.setTimes };
+          for (const ex of exercises) {
+            delete results[ex.name];
+            delete times[ex.name];
+          }
+          return { ...prev, setResults: results, setTimes: times };
+        });
+      }
+    },
+    [skippedExercises, updateSessionState]
+  );
+
   const toggleGroup = useCallback((groupId: number) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -571,6 +600,18 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
                 <span className="text-xs bg-gray-800/70 text-gray-300 px-1.5 py-0.5 rounded">
                   {group.exercises[0].sets} sets
                 </span>
+                <button
+                  onClick={() => handleSupersetSkipToggle(group.exercises)}
+                  className={`ml-auto text-xs font-medium px-2 py-1 rounded-lg transition-all duration-150 ${
+                    group.exercises.every((ex) => skippedExercises.has(ex.sheet_row))
+                      ? "bg-amber-900/50 text-amber-400"
+                      : "bg-gray-800/50 text-gray-500 hover:text-gray-400"
+                  }`}
+                >
+                  {group.exercises.every((ex) => skippedExercises.has(ex.sheet_row))
+                    ? "Unskip All"
+                    : "Skip All"}
+                </button>
               </div>
             )}
             {group.exercises.map((ex, i) => (
