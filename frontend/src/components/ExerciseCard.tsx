@@ -234,7 +234,7 @@ export default function ExerciseCard({
               </span>
               {exercise.target && (
                 <span className="text-xs bg-blue-900/40 text-blue-400 px-1.5 py-0.5 rounded">
-                  Target {targetReps} @ {localWeight}kg
+                  Target {targetReps} @ {exercise.suggested_weight ?? exercise.weight}kg
                 </span>
               )}
             </div>
@@ -308,14 +308,12 @@ export default function ExerciseCard({
             </button>
             <div className="text-center" aria-live="polite">
               <div className="text-2xl font-bold text-white tabular-nums">{localWeight} <span className="text-sm font-normal text-gray-300">kg</span></div>
-              {isWeightIncrease && suggestedWeight != null && parseFloat(localWeight) === parseFloat(suggestedWeight) && (
-                <div className="text-[10px] text-green-400 mt-0.5">
-                  +{(parseFloat(suggestedWeight) - prevWeight).toFixed(1)} suggested
-                </div>
-              )}
-              {prevWeight != null && parseFloat(localWeight) !== prevWeight && !isWeightIncrease && (
+              {prevWeight != null && (
                 <div className="text-[10px] text-gray-500 mt-0.5">
-                  prev {prevWeight}
+                  prev {prevWeight}kg
+                  {isWeightIncrease && suggestedWeight != null && (
+                    <span className="text-green-400"> → {suggestedWeight}kg</span>
+                  )}
                 </div>
               )}
             </div>
