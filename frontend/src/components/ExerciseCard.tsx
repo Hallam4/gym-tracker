@@ -72,7 +72,7 @@ export default function ExerciseCard({
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const totalSets = parseInt(exercise.sets) || 3;
-  const usingSuggestedWeight = exercise.suggested_weight != null && localWeight === exercise.suggested_weight;
+  const usingSuggestedWeight = exercise.suggested_weight != null && parseFloat(localWeight) === parseFloat(exercise.suggested_weight);
   const targetReps = (usingSuggestedWeight ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
 
   const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
@@ -305,12 +305,12 @@ export default function ExerciseCard({
             </button>
             <div className="text-center" aria-live="polite">
               <div className="text-2xl font-bold text-white tabular-nums">{localWeight} <span className="text-sm font-normal text-gray-300">kg</span></div>
-              {isWeightIncrease && localWeight === suggestedWeight && (
+              {isWeightIncrease && suggestedWeight != null && parseFloat(localWeight) === parseFloat(suggestedWeight) && (
                 <div className="text-[10px] text-green-400 mt-0.5">
                   +{(parseFloat(suggestedWeight) - prevWeight).toFixed(1)} suggested
                 </div>
               )}
-              {prevWeight != null && localWeight !== String(prevWeight) && !isWeightIncrease && (
+              {prevWeight != null && parseFloat(localWeight) !== prevWeight && !isWeightIncrease && (
                 <div className="text-[10px] text-gray-500 mt-0.5">
                   prev {prevWeight}
                 </div>
