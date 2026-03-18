@@ -64,6 +64,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(loadHiddenTabs);
   const [showSettings, setShowSettings] = useState(false);
+  const [workoutActive, setWorkoutActive] = useState(false);
 
   // Long-press handler (3s on header)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,13 +165,12 @@ export default function App() {
         </button>
       </header>
 
-      <main
-        role="tabpanel"
-        id={`tabpanel-${tab}`}
-        aria-labelledby={`tab-${tab}`}
-      >
+      <main>
         {tab === "home" && <HomeDashboard onNavigate={setTab} />}
-        {tab === "today" && <ErrorBoundary><TodayWorkout /></ErrorBoundary>}
+        {/* TodayWorkout stays mounted so timer/scroll/state survive tab switches */}
+        <div style={{ display: tab === "today" ? "block" : "none" }} role="tabpanel" id="tabpanel-today" aria-labelledby="tab-today">
+          <ErrorBoundary><TodayWorkout onActiveChange={setWorkoutActive} /></ErrorBoundary>
+        </div>
         {tab === "browse" && <WorkoutBrowser />}
         {tab === "progress" && <ProgressCharts />}
         {tab === "prs" && <PRBoard />}
@@ -194,7 +194,12 @@ export default function App() {
                   : "text-gray-400 hover:text-gray-300"
               }`}
             >
-              {t.label}
+              <span className="relative">
+                {t.label}
+                {t.key === "today" && workoutActive && tab !== "today" && (
+                  <span className="absolute -top-1 -right-2 w-2 h-2 bg-green-500 rounded-full" />
+                )}
+              </span>
             </button>
           ))}
         </div>

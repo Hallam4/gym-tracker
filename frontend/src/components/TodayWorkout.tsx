@@ -21,7 +21,7 @@ const TYPE_LABELS: Record<string, string> = {
 const MAX_SETS = 5;
 const REST_DURATION_S = 240; // 4 minutes
 
-export default function TodayWorkout() {
+export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (active: boolean) => void }) {
   const [selectedType, setSelectedType] = useState<string>("U1");
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -391,6 +391,12 @@ export default function TodayWorkout() {
 
   const exerciseCount = session?.exercises.length ?? 0;
   const skippedCount = skippedExercises.size;
+
+  // Report active workout state to parent (for tab indicator)
+  const workoutActive = timerRunning || timerSeconds > 0 || doneSets > 0;
+  useEffect(() => {
+    onActiveChange?.(workoutActive);
+  }, [workoutActive, onActiveChange]);
 
   if (isLoading) return (
     <div className="space-y-4 py-4" role="status">
