@@ -42,6 +42,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
   const [restTimerDone, setRestTimerDone] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const restDoneTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const soundIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const longPressRef = useRef<ReturnType<typeof setTimeout>>();
   const longPressFiredRef = useRef(false);
   const queryClient = useQueryClient();
@@ -95,6 +96,24 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     };
   }, [timerRunning]);
 
+  const playAlertBeeps = useCallback((count: number, freqHz: number, durationMs: number, gapMs: number) => {
+    try {
+      const ctx = new AudioContext();
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.value = 0.4;
+      for (let i = 0; i < count; i++) {
+        const osc = ctx.createOscillator();
+        osc.connect(gain);
+        osc.frequency.value = freqHz;
+        const startTime = ctx.currentTime + i * (durationMs + gapMs) / 1000;
+        osc.start(startTime);
+        osc.stop(startTime + durationMs / 1000);
+      }
+      setTimeout(() => ctx.close(), count * (durationMs + gapMs) + 500);
+    } catch {}
+  }, []);
+
   // Rest timer countdown
   useEffect(() => {
     if (!restTimerEnd) {
@@ -107,36 +126,26 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
       if (remaining <= 0 && !restTimerDone) {
         setRestTimerDone(true);
         try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
-        try {
-          const ctx = new AudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 880;
-          gain.gain.value = 0.15;
-          osc.start();
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-          osc.stop(ctx.currentTime + 0.5);
-          setTimeout(() => ctx.close(), 1000);
-        } catch {}
-        if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
-        restDoneTimerRef.current = setTimeout(() => {
-          setRestTimerEnd(null);
-          setRestCountdown(null);
-          setRestTimerDone(false);
-        }, 5000);
+        // Initial 3 rapid beeps
+        playAlertBeeps(3, 880, 150, 100);
+        // Repeat 2 beeps + vibrate every 3s until dismissed
+        if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+        soundIntervalRef.current = setInterval(() => {
+          playAlertBeeps(2, 880, 150, 100);
+          try { navigator.vibrate?.([200, 100, 200]); } catch {}
+        }, 3000);
       }
     };
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [restTimerEnd, restTimerDone]);
+  }, [restTimerEnd, restTimerDone, playAlertBeeps]);
 
   // Clean up rest done timer on unmount
   useEffect(() => {
     return () => {
       if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+      if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
     };
   }, []);
 
@@ -192,6 +201,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
 
   const switchToType = useCallback((t: string) => {
     setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setPendingTypeSwitch(null); setSelectedType(t);
+    if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
   }, []);
 
   const handleWorkoutReset = useCallback(() => {
@@ -211,19 +221,25 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     setResetConfirmVisible(false);
     setResetKey((k) => k + 1);
     if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+    if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
   }, [clearState]);
+
+  const dismissRestTimer = useCallback(() => {
+    setRestTimerEnd(null);
+    setRestCountdown(null);
+    setRestTimerDone(false);
+    if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+    if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+  }, []);
 
   const handleTimerLongPressStart = useCallback(() => {
     longPressFiredRef.current = false;
     longPressRef.current = setTimeout(() => {
       longPressFiredRef.current = true;
-      setRestTimerEnd(null);
-      setRestCountdown(null);
-      setRestTimerDone(false);
-      if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
+      dismissRestTimer();
       try { navigator.vibrate?.(50); } catch {}
     }, 500);
-  }, []);
+  }, [dismissRestTimer]);
 
   const handleTimerLongPressEnd = useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current);
@@ -260,6 +276,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
         });
       }
       if (shouldStartRest) {
+        if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
         setRestTimerEnd(Date.now() + REST_DURATION_S * 1000);
         setRestTimerDone(false);
         if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
@@ -528,6 +545,19 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
         );
       })()}
 
+      {/* Full-screen GO overlay — visible from across the room */}
+      {restTimerDone && (
+        <div
+          className="fixed inset-0 z-10 flex flex-col items-center justify-center go-overlay-pulse"
+          onClick={dismissRestTimer}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="text-7xl font-black text-green-400 go-text-pulse">GO</div>
+          <div className="text-sm text-gray-400 mt-4">tap to dismiss</div>
+        </div>
+      )}
+
       {/* Unified timer display — sticky so it's visible during later exercises */}
       <div className={`flex items-center justify-center mb-3 ${restTimerEnd ? "sticky top-0 z-20 py-2 -mx-4 px-4 bg-gray-950/90 backdrop-blur-sm" : ""}`}>
         <button
@@ -746,6 +776,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
             setRestTimerEnd(null);
             setRestCountdown(null);
             setRestTimerDone(false);
+            if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
           }}
         />
       )}
