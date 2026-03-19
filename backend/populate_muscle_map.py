@@ -74,6 +74,8 @@ EXERCISES = [
     ["Lying Leg Raise", "abs", "obliques", "1.0", "0.4"],
     # Crunch — primary abs
     ["Crunch", "abs", "obliques", "1.0", "0.2"],
+    # Pause Squat — same as squat
+    ["Pause Squat", "quadriceps, gluteal", "hamstring, abs", "1.0, 0.8", "0.4, 0.2"],
 ]
 
 
