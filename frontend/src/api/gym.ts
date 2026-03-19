@@ -147,6 +147,32 @@ export interface HistorySessionsResponse {
   sessions: HistorySession[];
 }
 
+export interface MuscleVolume {
+  volume: number;
+  tier: number;
+  percentile: number | null;
+}
+
+export interface WeekVolumeResponse {
+  week: string;
+  week_start: string;
+  week_end: string;
+  is_partial: boolean;
+  muscles: Record<string, MuscleVolume>;
+  warnings: string[];
+}
+
+export interface MuscleWeekEntry {
+  week: string;
+  volume: number;
+  tier: number;
+}
+
+export interface MuscleHistoryResponse {
+  muscle: string;
+  weeks: MuscleWeekEntry[];
+}
+
 export const api = {
   // New Structure-based endpoints
   getStructure: (type: string) =>
@@ -167,4 +193,10 @@ export const api = {
     fetchJSON<ProgressResponse>(`/api/progress/${encodeURIComponent(exercise)}`),
   getPRs: () => fetchJSON<PRsResponse>("/api/prs"),
   getStreaks: () => fetchJSON<StreakResponse>("/api/streaks"),
+  getWeekVolume: (date?: string) =>
+    fetchJSON<WeekVolumeResponse>(`/api/volume/week${date ? `?date=${date}` : ""}`),
+  getMuscleHistory: (muscle: string, weeks?: number) =>
+    fetchJSON<MuscleHistoryResponse>(
+      `/api/volume/history?muscle=${encodeURIComponent(muscle)}&weeks=${weeks ?? 12}`
+    ),
 };

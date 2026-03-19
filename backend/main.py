@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import sheets_client
 import parser
 import history
+import volume
 from models import (
     Exercise,
     WorkoutSession,
@@ -15,6 +16,8 @@ from models import (
     CompleteWorkoutRequest,
     HistorySession,
     HistorySessionsResponse,
+    WeekVolumeResponse,
+    MuscleHistoryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -234,6 +237,60 @@ async def get_progress(exercise: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e))
     return ProgressResponse(exercise=exercise, history=data)
+
+
+@app.get("/api/volume/week", response_model=WeekVolumeResponse)
+async def get_volume_week(date: str | None = None):
+    """Get per-muscle volume for the ISO week containing the given date."""
+    try:
+        target = None
+        if date:
+            from datetime import date as date_cls
+            target = date_cls.fromisoformat(date)
+        data = volume.get_week_volume(target)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return WeekVolumeResponse(**data)
+
+
+@app.get("/api/volume/history", response_model=MuscleHistoryResponse)
+async def get_volume_history(muscle: str, weeks: int = 12):
+    """Get weekly volume time series for a single muscle."""
+    if weeks < 1 or weeks > 52:
+        raise HTTPException(status_code=400, detail="weeks must be between 1 and 52")
+    try:
+        data = volume.get_muscle_history(muscle, weeks)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return MuscleHistoryResponse(**data)
+
+
+@app.post("/api/admin/populate-muscle-map", dependencies=[Depends(_require_api_key)])
+async def populate_muscle_map():
+    """One-time endpoint to populate the Muscle Map tab."""
+    try:
+        from populate_muscle_map import HEADER, EXERCISES
+        service = sheets_client._get_service()
+        tab = "Muscle Map"
+        # Clear existing
+        service.spreadsheets().values().clear(
+            spreadsheetId=sheets_client.SPREADSHEET_ID,
+            range=f"'{tab}'",
+        ).execute()
+        # Write all rows
+        rows = [HEADER] + EXERCISES
+        service.spreadsheets().values().update(
+            spreadsheetId=sheets_client.SPREADSHEET_ID,
+            range=f"'{tab}'!A1",
+            valueInputOption="RAW",
+            body={"values": rows},
+        ).execute()
+        sheets_client.invalidate_cache()
+        return {"status": "ok", "exercises_written": len(EXERCISES)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
 
 
 @app.post("/api/cache/invalidate", dependencies=[Depends(_require_api_key)])

@@ -127,3 +127,29 @@ class HistorySession(BaseModel):
 
 class HistorySessionsResponse(BaseModel):
     sessions: list[HistorySession]
+
+
+class MuscleVolume(BaseModel):
+    volume: float
+    tier: int  # 0-3
+    percentile: int | None
+
+
+class WeekVolumeResponse(BaseModel):
+    week: str
+    week_start: str
+    week_end: str
+    is_partial: bool
+    muscles: dict[str, MuscleVolume]
+    warnings: list[str]
+
+
+class MuscleWeekEntry(BaseModel):
+    week: str
+    volume: float
+    tier: int
+
+
+class MuscleHistoryResponse(BaseModel):
+    muscle: str
+    weeks: list[MuscleWeekEntry]

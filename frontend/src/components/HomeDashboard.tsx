@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type PREntry } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
 import StreakDashboard from "./StreakDashboard";
+import BodyMap from "./BodyMap";
 
 type Tab = "home" | "today" | "browse" | "progress" | "prs";
 
@@ -37,6 +38,8 @@ export default function HomeDashboard({ onNavigate }: Props) {
       </div>
 
       <StreakDashboard />
+
+      <BodyMap />
 
       {recentPRs.length > 0 && (
         <section aria-label="Recent personal records">
