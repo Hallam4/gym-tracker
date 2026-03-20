@@ -294,10 +294,10 @@ async def populate_muscle_map():
 
 
 @app.patch("/api/structure/weight", dependencies=[Depends(_require_api_key)])
-async def update_weight(exercise: str, weight: float | None = None, target: int | None = None, workout_type: str | None = None):
-    """Update an exercise's weight and/or target in the Structure tab."""
-    if weight is None and target is None:
-        raise HTTPException(status_code=400, detail="Provide weight and/or target")
+async def update_weight(exercise: str, weight: float | None = None, target: int | None = None, workout_type: str | None = None, new_name: str | None = None):
+    """Update an exercise's weight, target, and/or name in the Structure tab."""
+    if weight is None and target is None and new_name is None:
+        raise HTTPException(status_code=400, detail="Provide weight, target, and/or new_name")
     try:
         rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
         by_type = parser.parse_structure_tab(rows)
@@ -305,6 +305,7 @@ async def update_weight(exercise: str, weight: float | None = None, target: int 
         col_map = {c.strip().lower(): j for j, c in enumerate(header)}
         weight_col = col_map.get("weight")
         target_col = col_map.get("target")
+        exercise_col = col_map.get("exercise", 1)
 
         updates = []
         matched = 0
@@ -314,6 +315,8 @@ async def update_weight(exercise: str, weight: float | None = None, target: int 
             for ex in exercises:
                 if ex.name.lower() == exercise.lower():
                     matched += 1
+                    if new_name is not None:
+                        updates.append({"row": ex.sheet_row, "col": exercise_col, "value": new_name})
                     if weight is not None and weight_col is not None:
                         updates.append({"row": ex.sheet_row, "col": weight_col, "value": f"{weight}kg"})
                     if target is not None and target_col is not None:
@@ -323,11 +326,14 @@ async def update_weight(exercise: str, weight: float | None = None, target: int 
             raise HTTPException(status_code=404, detail=f"Exercise '{exercise}' not found")
 
         sheets_client.update_structure_cells(updates)
-        result = {"status": "ok", "updated": matched, "exercise": exercise}
+        sheets_client.invalidate_cache()
+        result = {"status": "ok", "updated": matched, "exercise": new_name or exercise}
         if weight is not None:
             result["weight"] = weight
         if target is not None:
             result["target"] = target
+        if new_name is not None:
+            result["new_name"] = new_name
         return result
     except HTTPException:
         raise
