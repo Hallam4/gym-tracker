@@ -4,7 +4,7 @@ import { fmtDate } from "../utils/formatDate";
 import StreakDashboard from "./StreakDashboard";
 import BodyMap from "./BodyMap";
 
-type Tab = "home" | "today" | "browse" | "progress" | "prs";
+type Tab = "home" | "today" | "history" | "progress";
 
 interface Props {
   onNavigate: (tab: Tab) => void;

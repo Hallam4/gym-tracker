@@ -34,17 +34,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 import WorkoutBrowser from "./components/WorkoutBrowser";
 import ProgressCharts from "./components/ProgressCharts";
-import PRBoard from "./components/PRBoard";
 import HomeDashboard from "./components/HomeDashboard";
 
-type Tab = "home" | "today" | "browse" | "progress" | "prs";
+type Tab = "home" | "today" | "history" | "progress";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "home", label: "Home" },
   { key: "today", label: "Today" },
-  { key: "browse", label: "Browse" },
+  { key: "history", label: "History" },
   { key: "progress", label: "Progress" },
-  { key: "prs", label: "PRs" },
 ];
 
 const STORAGE_KEY = "gym-hidden-tabs";
@@ -176,9 +174,8 @@ export default function App() {
         <div style={{ display: tab === "today" ? "block" : "none" }} role="tabpanel" id="tabpanel-today" aria-labelledby="tab-today">
           <ErrorBoundary><TodayWorkout onActiveChange={setWorkoutActive} /></ErrorBoundary>
         </div>
-        {tab === "browse" && <WorkoutBrowser />}
+        {tab === "history" && <WorkoutBrowser />}
         {tab === "progress" && <ProgressCharts />}
-        {tab === "prs" && <PRBoard />}
       </main>
 
       {/* Bottom tab bar */}

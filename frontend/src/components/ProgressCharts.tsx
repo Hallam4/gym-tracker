@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ComposedChart,
@@ -12,6 +12,16 @@ import {
 } from "recharts";
 import { api } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
+import PRBoard from "./PRBoard";
+
+type SubView = "charts" | "prs";
+
+const PERIODS = [
+  { label: "3M", months: 3 },
+  { label: "6M", months: 6 },
+  { label: "1Y", months: 12 },
+  { label: "All", months: null },
+] as const;
 
 const tooltipStyle = {
   backgroundColor: "#111827",
@@ -35,8 +45,10 @@ function tooltipFormatter(value: number, name: string) {
 }
 
 export default function ProgressCharts() {
+  const [subView, setSubView] = useState<SubView>("charts");
   const [exercise, setExercise] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [period, setPeriod] = useState<number | null>(6); // default 6 months
 
   // Fetch recent history sessions to build exercise name list
   const { data: sessionsData } = useQuery({
@@ -64,12 +76,40 @@ export default function ProgressCharts() {
       )
     : allExercises;
 
-  const chartData = progress?.history ?? [];
+  const rawChartData = progress?.history ?? [];
+
+  const chartData = useMemo(() => {
+    if (!period) return rawChartData;
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - period);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return rawChartData.filter((d) => d.date >= cutoffStr);
+  }, [rawChartData, period]);
 
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-bold text-white">Progress</h2>
 
+      {/* Charts / PRs toggle */}
+      <div className="flex bg-gray-900 rounded-xl p-1 ring-1 ring-gray-800/60">
+        {(["charts", "prs"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setSubView(v)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+              subView === v
+                ? "bg-gray-800 text-white shadow-sm"
+                : "text-gray-400 hover:text-gray-300"
+            }`}
+          >
+            {v === "charts" ? "Charts" : "PRs"}
+          </button>
+        ))}
+      </div>
+
+      {subView === "prs" && <PRBoard />}
+
+      {subView === "charts" && <>
       {/* Exercise search */}
       <div className="space-y-3">
         <label htmlFor="exercise-search" className="sr-only">Search exercise</label>
@@ -132,6 +172,23 @@ export default function ProgressCharts() {
 
       {exercise && chartData.length > 0 && (
         <section aria-label={`Progress charts for ${exercise}`} className="space-y-4">
+          {/* Time period pills */}
+          <div className="flex gap-2" role="group" aria-label="Time period filter">
+            {PERIODS.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => setPeriod(p.months)}
+                aria-pressed={period === p.months}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 ${
+                  period === p.months
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                    : "bg-gray-800 text-gray-400 ring-1 ring-gray-700/50 hover:bg-gray-700"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           {/* Weight over time */}
           <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
@@ -299,6 +356,7 @@ export default function ProgressCharts() {
           No history for this exercise yet. Complete a workout to start tracking.
         </div>
       )}
+      </>}
     </div>
   );
 }

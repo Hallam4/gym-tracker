@@ -41,7 +41,9 @@ export default function WorkoutBrowser() {
   });
 
   return (
-    <div>
+    <div className="space-y-3">
+      <h2 className="text-lg font-bold text-white">History</h2>
+
       {/* Type selector */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-3" role="group" aria-label="Workout type filter">
         {TYPES.map((t) => (
@@ -76,6 +78,7 @@ export default function WorkoutBrowser() {
             placeholder="Filter sessions..."
             className="w-full bg-gray-900 text-gray-300 ring-1 ring-gray-800/60 rounded-2xl px-4 py-3 touch-target focus-visible:ring-blue-500/70 focus-visible:outline-none transition-shadow duration-200 placeholder:text-gray-500"
           />
+          <div className="text-xs text-gray-500">{filteredSessions.length} session{filteredSessions.length !== 1 ? "s" : ""}</div>
           {filteredSessions.map((s) => (
             <button
               key={`${s.date}-${s.day}`}
