@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 type SubView = "warmup" | "rehab";
 
@@ -45,11 +45,73 @@ function saveLog(log: LogEntry[]) {
   localStorage.setItem(LOG_KEY, JSON.stringify(log));
 }
 
+function playBeep() {
+  try {
+    const ctx = new AudioContext();
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.value = 0.3;
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.1);
+    }
+  } catch { /* silent fail */ }
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+}
+
 export default function PrehabTab() {
   const [subView, setSubView] = useState<SubView>("warmup");
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [log, setLog] = useState<LogEntry[]>(loadLog);
   const [justSaved, setJustSaved] = useState(false);
+
+  const [restEnd, setRestEnd] = useState<number | null>(null);
+  const [restCountdown, setRestCountdown] = useState<number | null>(null);
+  const [restDone, setRestDone] = useState(false);
+  const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearRestTimer = useCallback(() => {
+    if (restInterval.current) clearInterval(restInterval.current);
+    restInterval.current = null;
+    setRestEnd(null);
+    setRestCountdown(null);
+    setRestDone(false);
+  }, []);
+
+  // Countdown interval
+  useEffect(() => {
+    if (restEnd === null) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
+      setRestCountdown(remaining);
+      if (remaining <= 0) {
+        if (restInterval.current) clearInterval(restInterval.current);
+        restInterval.current = null;
+        setRestEnd(null);
+        setRestDone(true);
+        playBeep();
+        setTimeout(() => setRestDone(false), 2000);
+      }
+    };
+    tick();
+    restInterval.current = setInterval(tick, 200);
+    return () => {
+      if (restInterval.current) clearInterval(restInterval.current);
+      restInterval.current = null;
+    };
+  }, [restEnd]);
+
+  const handleRestTap = () => {
+    if (restDone) return;
+    if (restEnd !== null) {
+      clearRestTimer();
+    } else {
+      setRestEnd(Date.now() + 30_000);
+    }
+  };
 
   const exercises = subView === "warmup" ? WARMUP_EXERCISES : REHAB_EXERCISES;
 
@@ -105,6 +167,26 @@ export default function PrehabTab() {
             {v === "warmup" ? "Warm-Up" : "Rehab"}
           </button>
         ))}
+      </div>
+
+      {/* Rest timer button */}
+      <div className="sticky top-0 z-20 backdrop-blur-sm pb-3">
+        <button
+          onClick={handleRestTap}
+          className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
+            restDone
+              ? "bg-green-600 text-white animate-pulse"
+              : restEnd !== null
+              ? "bg-blue-600 text-white"
+              : "bg-gray-800/60 text-gray-400 ring-1 ring-gray-700/30"
+          }`}
+        >
+          {restDone
+            ? "GO"
+            : restEnd !== null
+            ? `0:${String(restCountdown ?? 0).padStart(2, "0")}`
+            : "Rest 0:30"}
+        </button>
       </div>
 
       {/* Exercise list */}
