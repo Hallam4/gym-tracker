@@ -294,27 +294,41 @@ async def populate_muscle_map():
 
 
 @app.patch("/api/structure/weight", dependencies=[Depends(_require_api_key)])
-async def update_weight(exercise: str, weight: float, workout_type: str | None = None):
-    """Update an exercise's weight in the Structure tab."""
+async def update_weight(exercise: str, weight: float | None = None, target: int | None = None, workout_type: str | None = None):
+    """Update an exercise's weight and/or target in the Structure tab."""
+    if weight is None and target is None:
+        raise HTTPException(status_code=400, detail="Provide weight and/or target")
     try:
         rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
         by_type = parser.parse_structure_tab(rows)
         header = rows[0]
-        weight_col = next(j for j, c in enumerate(header) if c.strip().lower() == "weight")
+        col_map = {c.strip().lower(): j for j, c in enumerate(header)}
+        weight_col = col_map.get("weight")
+        target_col = col_map.get("target")
 
         updates = []
+        matched = 0
         for wtype, exercises in by_type.items():
             if workout_type and wtype.upper() != workout_type.upper():
                 continue
             for ex in exercises:
                 if ex.name.lower() == exercise.lower():
-                    updates.append({"row": ex.sheet_row, "col": weight_col, "value": f"{weight}kg"})
+                    matched += 1
+                    if weight is not None and weight_col is not None:
+                        updates.append({"row": ex.sheet_row, "col": weight_col, "value": f"{weight}kg"})
+                    if target is not None and target_col is not None:
+                        updates.append({"row": ex.sheet_row, "col": target_col, "value": str(target)})
 
-        if not updates:
+        if not matched:
             raise HTTPException(status_code=404, detail=f"Exercise '{exercise}' not found")
 
         sheets_client.update_structure_cells(updates)
-        return {"status": "ok", "updated": len(updates), "exercise": exercise, "weight": weight}
+        result = {"status": "ok", "updated": matched, "exercise": exercise}
+        if weight is not None:
+            result["weight"] = weight
+        if target is not None:
+            result["target"] = target
+        return result
     except HTTPException:
         raise
     except Exception as e:
