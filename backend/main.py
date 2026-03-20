@@ -293,6 +293,34 @@ async def populate_muscle_map():
         raise HTTPException(status_code=500, detail=_safe_error(e))
 
 
+@app.patch("/api/structure/weight", dependencies=[Depends(_require_api_key)])
+async def update_weight(exercise: str, weight: float, workout_type: str | None = None):
+    """Update an exercise's weight in the Structure tab."""
+    try:
+        rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
+        by_type = parser.parse_structure_tab(rows)
+        header = rows[0]
+        weight_col = next(j for j, c in enumerate(header) if c.strip().lower() == "weight")
+
+        updates = []
+        for wtype, exercises in by_type.items():
+            if workout_type and wtype.upper() != workout_type.upper():
+                continue
+            for ex in exercises:
+                if ex.name.lower() == exercise.lower():
+                    updates.append({"row": ex.sheet_row, "col": weight_col, "value": f"{weight}kg"})
+
+        if not updates:
+            raise HTTPException(status_code=404, detail=f"Exercise '{exercise}' not found")
+
+        sheets_client.update_structure_cells(updates)
+        return {"status": "ok", "updated": len(updates), "exercise": exercise, "weight": weight}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+
+
 @app.post("/api/cache/invalidate", dependencies=[Depends(_require_api_key)])
 async def invalidate_cache():
     sheets_client.invalidate_cache()
