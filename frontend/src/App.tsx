@@ -35,14 +35,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 import WorkoutBrowser from "./components/WorkoutBrowser";
 import ProgressCharts from "./components/ProgressCharts";
 import HomeDashboard from "./components/HomeDashboard";
+import PrehabTab from "./components/PrehabTab";
 
-type Tab = "home" | "today" | "history" | "progress";
+type Tab = "home" | "today" | "history" | "progress" | "prehab";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "home", label: "Home" },
   { key: "today", label: "Today" },
   { key: "history", label: "History" },
   { key: "progress", label: "Progress" },
+  { key: "prehab", label: "Prehab" },
 ];
 
 const STORAGE_KEY = "gym-hidden-tabs";
@@ -176,6 +178,7 @@ export default function App() {
         </div>
         {tab === "history" && <WorkoutBrowser />}
         {tab === "progress" && <ProgressCharts />}
+        {tab === "prehab" && <PrehabTab />}
       </main>
 
       {/* Bottom tab bar */}
