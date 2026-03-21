@@ -70,9 +70,10 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     };
   }, [timerRunning]);
 
-  // Keep screen on during active workout
+  // Keep screen on during active workout (any sets logged)
+  const hasAnySets = Object.keys(sessionState.setResults).length > 0;
   useEffect(() => {
-    if (!timerRunning) return;
+    if (!hasAnySets) return;
     let wakeLock: WakeLockSentinel | null = null;
 
     const request = async () => {
@@ -94,7 +95,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
       wakeLock?.release();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [timerRunning]);
+  }, [hasAnySets]);
 
   const playAlertBeeps = useCallback((count: number, freqHz: number, durationMs: number, gapMs: number) => {
     try {
@@ -776,6 +777,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
             setRestTimerEnd(null);
             setRestCountdown(null);
             setRestTimerDone(false);
+            setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false });
             if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
           }}
         />
