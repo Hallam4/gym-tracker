@@ -585,12 +585,14 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
                   {Math.floor((restCountdown ?? 0) / 60)}:{((restCountdown ?? 0) % 60).toString().padStart(2, "0")}
                 </div>
               )}
-              <div className="text-xs font-mono text-gray-300 mt-1" aria-live="off">
+              <div className={`text-xs font-mono mt-1 transition-colors duration-150 ${timerRunning ? "text-gray-300" : "text-gray-500"}`} aria-live="off">
+                {!timerRunning && timerSeconds > 0 && <span className="mr-1">❚❚</span>}
                 {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
               </div>
             </div>
           ) : (
-            <span className="text-xl font-mono text-white tabular-nums" aria-live="off">
+            <span className={`text-xl font-mono tabular-nums transition-colors duration-150 ${timerRunning ? "text-white" : "text-gray-400"}`} aria-live="off">
+              {!timerRunning && timerSeconds > 0 && <span className="text-gray-500 mr-1 text-base">❚❚</span>}
               {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
             </span>
           )}
