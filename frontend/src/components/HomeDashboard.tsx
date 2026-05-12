@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type PREntry } from "../api/gym";
 import { fmtDate } from "../utils/formatDate";
+import { getNextWorkoutType } from "../utils/workoutRotation";
 import StreakDashboard from "./StreakDashboard";
 import BodyMap from "./BodyMap";
+import InactivityNudge from "./InactivityNudge";
+import NextWorkoutCard from "./NextWorkoutCard";
 
 type Tab = "home" | "today" | "history" | "progress";
 
@@ -15,6 +18,29 @@ export default function HomeDashboard({ onNavigate }: Props) {
     queryKey: ["prs"],
     queryFn: api.getPRs,
   });
+
+  const { data: streakData } = useQuery({
+    queryKey: ["streaks"],
+    queryFn: api.getStreaks,
+  });
+
+  const { data: sessionsData } = useQuery({
+    queryKey: ["history-sessions", { limit: 5 }],
+    queryFn: () => api.getHistorySessions({ limit: 5 }),
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const workoutDates = streakData?.streaks.workout_dates ?? [];
+  const lastWorkoutDate = workoutDates[workoutDates.length - 1];
+  const daysSinceLastWorkout = lastWorkoutDate
+    ? Math.floor(
+        (Date.now() - new Date(lastWorkoutDate).getTime()) / (1000 * 60 * 60 * 24)
+      )
+    : null;
+  const doneToday = lastWorkoutDate === today;
+
+  const sessions = sessionsData?.sessions ?? [];
+  const nextWorkout = getNextWorkoutType(sessions);
 
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -32,12 +58,29 @@ export default function HomeDashboard({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
+      {daysSinceLastWorkout !== null && daysSinceLastWorkout >= 2 && (
+        <InactivityNudge
+          daysSinceLastWorkout={daysSinceLastWorkout}
+          currentStreakWeeks={streakData?.streaks.current_streak ?? 0}
+          onStartWorkout={() => onNavigate("today")}
+        />
+      )}
+
       <div>
         <h2 className="text-lg font-bold text-white">Dashboard</h2>
         <p className="text-sm text-gray-400">Your training at a glance</p>
       </div>
 
       <StreakDashboard />
+
+      {nextWorkout && (
+        <NextWorkoutCard
+          nextType={nextWorkout.code}
+          nextLabel={nextWorkout.label}
+          doneToday={doneToday}
+          onStartWorkout={() => onNavigate("today")}
+        />
+      )}
 
       <BodyMap />
 
