@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-type SubView = "warmup" | "rehab";
+type SubView = "warmup" | "rehab" | "proprioception";
 
 interface Exercise {
   name: string;
@@ -29,6 +29,14 @@ const REHAB_EXERCISES: Exercise[] = [
   { name: "Band Internal Rotation", prescription: "3x15-20" },
   { name: "Prone Y-T-W Raises", prescription: "2-3x10-12 each" },
   { name: "Ball-on-Wall Circles", prescription: "3x30-45s each direction" },
+];
+
+const PROPRIOCEPTION_EXERCISES: Exercise[] = [
+  { name: "Single Leg Stand — Eyes Open", prescription: "30-60s each leg" },
+  { name: "Single Leg Stand — Eyes Closed", prescription: "30-60s each leg" },
+  { name: "Single Leg Stand — Cushion, Eyes Open", prescription: "30-60s each leg" },
+  { name: "Single Leg Stand — Cushion, Eyes Closed", prescription: "30-60s each leg" },
+  { name: "Single Leg Stand — Eyes Closed, Head Turning", prescription: "30-60s each leg" },
 ];
 
 const LOG_KEY = "gym-prehab-log";
@@ -113,7 +121,7 @@ export default function PrehabTab() {
     }
   };
 
-  const exercises = subView === "warmup" ? WARMUP_EXERCISES : REHAB_EXERCISES;
+  const exercises = subView === "warmup" ? WARMUP_EXERCISES : subView === "rehab" ? REHAB_EXERCISES : PROPRIOCEPTION_EXERCISES;
 
   // Reset checks when switching sub-view
   useEffect(() => {
@@ -154,7 +162,7 @@ export default function PrehabTab() {
 
       {/* Segmented toggle */}
       <div className="flex gap-1 bg-gray-800/60 rounded-xl p-1 mb-5">
-        {(["warmup", "rehab"] as const).map((v) => (
+        {(["warmup", "rehab", "proprioception"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setSubView(v)}
@@ -164,7 +172,7 @@ export default function PrehabTab() {
                 : "text-gray-400 hover:text-gray-300"
             }`}
           >
-            {v === "warmup" ? "Warm-Up" : "Rehab"}
+            {v === "warmup" ? "Warm-Up" : v === "rehab" ? "Rehab" : "Proprio"}
           </button>
         ))}
       </div>
@@ -281,10 +289,12 @@ export default function PrehabTab() {
                     className={`text-xs px-2 py-0.5 rounded-full ${
                       entry.type === "warmup"
                         ? "bg-orange-900/40 text-orange-400"
-                        : "bg-purple-900/40 text-purple-400"
+                        : entry.type === "rehab"
+                        ? "bg-purple-900/40 text-purple-400"
+                        : "bg-teal-900/40 text-teal-400"
                     }`}
                   >
-                    {entry.type === "warmup" ? "Warm-Up" : "Rehab"}
+                    {entry.type === "warmup" ? "Warm-Up" : entry.type === "rehab" ? "Rehab" : "Proprio"}
                   </span>
                 </div>
                 <span
