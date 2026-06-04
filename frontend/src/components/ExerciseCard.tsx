@@ -57,7 +57,11 @@ export default function ExerciseCard({
   const [localExpanded, setLocalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? localExpanded;
   const toggleExpand = onToggleExpand ?? (() => setLocalExpanded((e) => !e));
-  const [localWeight, setLocalWeight] = useState(exercise.suggested_weight ?? exercise.weight);
+  // Only evolve mode pre-fills the suggested (bumped) weight. strength is
+  // suggest-only — show the readiness hint but leave the working weight in place.
+  const mode = exercise.mode || "evolve";
+  const useSuggested = mode === "evolve" && exercise.suggested_weight != null;
+  const [localWeight, setLocalWeight] = useState(useSuggested ? exercise.suggested_weight! : exercise.weight);
   const [localNotes, setLocalNotes] = useState(exercise.notes);
   const [completedSets, setCompletedSets] = useState<(number | null)[]>(() => {
     const parsed = exercise.set_results.map((s) => (s ? parseInt(s) || null : null));
@@ -71,29 +75,34 @@ export default function ExerciseCard({
   const [activeSetIndex, setActiveSetIndex] = useState<number | null>(null);
   const popTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const totalSets = parseInt(exercise.sets) || 3;
+  // Variable set range: setMin = committed minimum (counts toward "done"),
+  // setMin..setMax = in-range optional, beyond setMax = bonus.
+  const setMin = exercise.set_min || parseInt(exercise.sets) || 3;
+  const setMax = Math.max(exercise.set_max || 0, setMin);
   // Lock target at mount time so it doesn't change when adjusting weight mid-workout
   const [targetReps] = useState(() => {
-    const initiallyUsingSuggested = exercise.suggested_weight != null;
-    return (initiallyUsingSuggested ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
+    return (useSuggested ? parseInt(exercise.suggested_target ?? "") : 0) || parseInt(exercise.target) || parseInt(exercise.reps) || 10;
   });
 
-  const normalDone = completedSets.slice(0, totalSets).filter((s) => s !== null).length;
-  const bonusDone = completedSets.slice(totalSets).filter((s) => s !== null).length;
-  const allDone = normalDone === totalSets;
+  const normalDone = completedSets.slice(0, setMin).filter((s) => s !== null).length;
+  const bonusDone = completedSets.slice(setMin).filter((s) => s !== null).length;
+  const allDone = normalDone === setMin;
 
-  // Detect if there's a weight suggestion different from the previous weight
+  // Mode-keyed progression signal. evolve pre-fills the bump ("Weight up!");
+  // strength only signals readiness ("Ready to add weight") without auto-bumping.
   const suggestedWeight = exercise.suggested_weight;
   const prevWeight = exercise.prev_weight;
   const isWeightIncrease = suggestedWeight != null && prevWeight != null && parseFloat(suggestedWeight) > prevWeight;
+  const showWeightUp = mode === "evolve" && isWeightIncrease;
+  const showStrengthReady = mode === "strength" && isWeightIncrease;
 
   useEffect(() => {
     if (isSkipped) {
       onProgressChange?.(0, 0);
     } else {
-      onProgressChange?.(normalDone, totalSets);
+      onProgressChange?.(normalDone, setMin);
     }
-  }, [normalDone, totalSets, onProgressChange, isSkipped]);
+  }, [normalDone, setMin, onProgressChange, isSkipped]);
 
   // Reset local state when exercise is skipped
   useEffect(() => {
@@ -205,9 +214,9 @@ export default function ExerciseCard({
                     : "bg-gray-800/70 text-gray-400"
                 }`}>
                   {allDone && <span className="mr-0.5" aria-hidden="true">&#10003;</span>}
-                  <span className="sr-only">{normalDone} of {totalSets} sets completed{bonusDone > 0 ? `, plus ${bonusDone} bonus` : ""}</span>
+                  <span className="sr-only">{normalDone} of {setMin} sets completed{bonusDone > 0 ? `, plus ${bonusDone} bonus` : ""}</span>
                   <span aria-hidden="true">
-                    {normalDone}/{totalSets}
+                    {normalDone}/{setMin}
                     {bonusDone > 0 && (
                       <span className="text-blue-400"> +{bonusDone}</span>
                     )}
@@ -238,13 +247,21 @@ export default function ExerciseCard({
               )}
             </div>
 
-            {/* Row 3: Progression signal — fires when you hit the top of the
-                rep range on all prescribed sets (single-session progression) */}
-            {isWeightIncrease && (
+            {/* Row 3: Progression signal — keyed on mode. evolve auto-bumps the
+                weight; strength only signals readiness (you bump it yourself). */}
+            {showWeightUp && (
               <div className="mt-1">
                 <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
                   <span aria-hidden="true">&#8593;</span>
                   Weight up! Hit your top reps
+                </span>
+              </div>
+            )}
+            {showStrengthReady && (
+              <div className="mt-1">
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">
+                  <span aria-hidden="true">&#9733;</span>
+                  Ready to add weight
                 </span>
               </div>
             )}
@@ -318,7 +335,9 @@ export default function ExerciseCard({
           {/* Set buttons */}
           <div className="grid grid-cols-5 gap-2.5" role="group" aria-label={`Sets for ${exercise.name}`}>
             {Array.from({ length: MAX_SETS }, (_, i) => {
-              const isBonus = i >= totalSets;
+              // Three tiers: required (< setMin), in-range optional (setMin..setMax), bonus (>= setMax)
+              const isBonus = i >= setMax;
+              const isInRange = !isBonus && i >= setMin;
               const isDone = completedSets[i] !== null;
               const reps = completedSets[i];
 
@@ -343,6 +362,9 @@ export default function ExerciseCard({
                 }
               } else if (isBonus) {
                 btnClass = "bg-gray-800/30 text-gray-600 border border-dashed border-gray-700/50 opacity-60";
+              } else if (isInRange) {
+                // In-range optional set: solid (loggable) but muted vs required
+                btnClass = "bg-gray-800/60 text-gray-500 opacity-70";
               } else {
                 btnClass = "bg-gray-800 text-gray-400";
               }
@@ -359,8 +381,10 @@ export default function ExerciseCard({
               const ariaLabel = isDone
                 ? `Set ${i + 1}: ${reps} reps completed. Tap to undo.`
                 : isBonus
-                  ? `Bonus set ${i + 1 - totalSets}. Tap to log.`
-                  : `Set ${i + 1}. Tap to log ${targetReps} reps.`;
+                  ? `Bonus set ${i + 1 - setMax}. Tap to log.`
+                  : isInRange
+                    ? `Optional in-range set ${i + 1}. Tap to log ${targetReps} reps.`
+                    : `Set ${i + 1}. Tap to log ${targetReps} reps.`;
 
               // Show prev rep count under empty sets for comparison
               const prevRep = exercise.prev_sets?.[i];

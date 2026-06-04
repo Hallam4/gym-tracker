@@ -19,6 +19,32 @@ HISTORY_HEADER = [
 # require confirmation across sessions.
 CONFIRMATION_SESSIONS = 1
 
+# --- Progression modes (Tier 1) -------------------------------------------
+# A per-exercise strategy: how the exercise progresses and how the rest timer
+# is sized. See docs/tier1-progression-design.md.
+#   strength  low reps, suggest-only (never auto-writes weight)
+#   evolve    hypertrophy double progression with variable set ranges
+#   volume    isolation; log only, no weight chasing
+#   amrap     bodyweight/finishers; track rep PRs, no weight progression
+MODES = ("strength", "evolve", "volume", "amrap")
+DEFAULT_MODE = "evolve"
+
+# Default (set_min, set_max) when the Structure Sets cell is blank.
+DEFAULT_SETS_BY_MODE = {
+    "strength": (3, 3),
+    "evolve": (3, 4),
+    "volume": (4, 4),
+    "amrap": (3, 3),
+}
+
+# Default rest-timer seconds per mode (frontend uses these when present).
+REST_BY_MODE = {
+    "strength": 180,
+    "evolve": 150,
+    "volume": 90,
+    "amrap": 60,
+}
+
 
 def _safe_get(row: list[str], idx: int) -> str:
     if idx < len(row):
@@ -122,21 +148,73 @@ def _parse_reps(s: str) -> int:
         return 0
 
 
-def _sets_at_ceiling(reps: list[int], prescribed: int, rep_max: int) -> bool:
-    """True if all *prescribed* (non-bonus) sets hit the rep ceiling.
+def _parse_set_range(s: str) -> tuple[int, int]:
+    """Parse a Sets cell into (set_min, set_max).
 
-    Only the first `prescribed` sets are evaluated, so bonus/AMRAP sets logged
-    beyond the prescription (which are often lighter) can't block progression.
-    Falls back to evaluating every logged set when the prescribed count is
-    unknown (0 / unparseable).
+    "3-4" -> (3, 4); "4" -> (4, 4); blank/garbage/"0" -> (0, 0) so the caller
+    can apply a mode default.
+    """
+    if not s:
+        return (0, 0)
+    txt = s.strip()
+    try:
+        if "-" in txt:
+            lo, hi = txt.split("-", 1)
+            lo_i, hi_i = int(lo.strip()), int(hi.strip())
+            if lo_i <= 0 or hi_i <= 0:
+                return (0, 0)
+            return (min(lo_i, hi_i), max(lo_i, hi_i))
+        n = int(txt)
+        return (n, n) if n > 0 else (0, 0)
+    except ValueError:
+        return (0, 0)
+
+
+def auto_writes_weight(mode: str) -> bool:
+    """Write-back policy: only `evolve` auto-writes weight/target to the sheet.
+
+    strength is suggest-only (the readiness signal shows, but the user bumps the
+    weight themselves); volume/amrap never chase weight.
+    """
+    return mode == "evolve"
+
+
+def resolve_mode(mode_cell: str, rep_min: int, rep_max: int, is_amrap: bool) -> str:
+    """Resolve a progression mode (hybrid: explicit Mode cell wins, else infer).
+
+    Inference: AMRAP -> amrap; rep_max <= 6 -> strength; rep_min >= 12 ->
+    volume; otherwise the evolve hypertrophy default.
+    """
+    if mode_cell:
+        m = mode_cell.strip().lower()
+        if m in MODES:
+            return m
+    if is_amrap:
+        return "amrap"
+    if rep_max and rep_max <= 6:
+        return "strength"
+    if rep_min and rep_min >= 12:
+        return "volume"
+    return DEFAULT_MODE
+
+
+def _sets_at_ceiling(reps: list[int], set_min: int, set_max: int, threshold: int) -> bool:
+    """True if at least `set_min` of the first `set_max` sets reach `threshold`.
+
+    Generalizes double progression to variable set ranges (e.g. 3-4): bonus
+    sets logged beyond `set_max` are ignored, and you don't need every set at
+    the ceiling — just `set_min` of them (order-independent). Falls back to
+    evaluating every logged set when the range is unknown (0, 0).
     """
     if not reps:
         return False
-    n = prescribed if prescribed > 0 else len(reps)
-    evaluated = reps[:n]
+    cap = set_max if set_max > 0 else len(reps)
+    evaluated = reps[:cap]
     if not evaluated:
         return False
-    return all(r >= rep_max for r in evaluated)
+    needed = set_min if set_min > 0 else len(evaluated)
+    hits = sum(1 for r in evaluated if r >= threshold)
+    return hits >= needed
 
 
 def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
@@ -291,9 +369,19 @@ def compute_double_progression(
     rep_max: int,
     history_rows: list[HistoryRow],
     current_target: int | None = None,
+    mode: str = DEFAULT_MODE,
 ) -> dict | None:
-    """Compute suggested weight/target using double progression with 2-session confirmation.
+    """Compute suggested weight/target for an exercise from its history.
 
+    `mode` selects the progression strategy (see MODES):
+      - evolve/strength: double progression. A weight increase is suggested once
+        `CONFIRMATION_SESSIONS` consecutive working sessions hit the ceiling
+        (>= set_min sets at rep_max). strength is computed identically here; the
+        suggest-only (no auto-write) behavior is enforced by the caller.
+      - volume/amrap: hold the working weight; no weight/target progression.
+
+    Per-session set ranges are read from each history row's Sets cell, so a
+    session is judged against the prescription that was in force at the time.
     Returns None if no history exists (use sheet defaults).
     """
     name_lower = exercise_name.lower()
@@ -319,12 +407,14 @@ def compute_double_progression(
             if s
         ]
         weight = _parse_weight(row.weight)
+        set_min, set_max = _parse_set_range(row.sets)
         recent_sessions.append({
             "date": d,
             "reps": set_reps,
             "weight": weight,
             "notes": row.notes,
-            "prescribed": _parse_reps(row.sets),
+            "set_min": set_min,
+            "set_max": set_max,
         })
 
     # Filter deloads: auto-detect by weight threshold + manual [DELOAD] marker
@@ -343,29 +433,33 @@ def compute_double_progression(
     prev_sets = prev["reps"]
     prev_weight = prev["weight"]
 
-    # Count consecutive working sessions at ceiling (prescribed sets >= rep_max,
-    # ignoring bonus sets logged beyond the prescription).
+    # Count consecutive working sessions at ceiling (>= set_min sets hit rep_max,
+    # bonus sets beyond set_max ignored), judged per-session against the Sets
+    # prescription in force at the time.
     sessions_at_ceiling = 0
     for sess in working_sessions:
-        if _sets_at_ceiling(sess["reps"], sess["prescribed"], rep_max):
+        if _sets_at_ceiling(sess["reps"], sess["set_min"], sess["set_max"], rep_max):
             sessions_at_ceiling += 1
         else:
             break
 
-    # Weight increase or target bump via double progression
-    # Base weight on most recent working session, not deload
     base_weight = working_sessions[0]["weight"]
     if current_target is None:
         current_target = rep_max
-    if sessions_at_ceiling >= CONFIRMATION_SESSIONS:
+
+    if mode in ("volume", "amrap"):
+        # Log-only modes: hold the working weight, no target evolution.
+        suggested_weight = str(base_weight) if base_weight > 0 else None
+        suggested_target = str(current_target)
+    elif sessions_at_ceiling >= CONFIRMATION_SESSIONS:
         suggested_weight = str(base_weight + 2.5)
         suggested_target = str(rep_min)
     else:
         suggested_weight = str(base_weight) if base_weight > 0 else None
         # Bump target if the most recent working session hit current_target on
-        # all prescribed sets (bonus sets ignored, same as the ceiling check).
+        # >= set_min sets (bonus sets ignored, same as the ceiling check).
         latest = working_sessions[0]
-        if _sets_at_ceiling(latest["reps"], latest["prescribed"], current_target) and current_target < rep_max:
+        if _sets_at_ceiling(latest["reps"], latest["set_min"], latest["set_max"], current_target) and current_target < rep_max:
             suggested_target = str(current_target + 1)
         else:
             suggested_target = str(current_target)

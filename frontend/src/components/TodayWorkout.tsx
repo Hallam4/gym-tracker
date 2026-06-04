@@ -278,7 +278,13 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
       }
       if (shouldStartRest) {
         if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-        setRestTimerEnd(Date.now() + REST_DURATION_S * 1000);
+        // Mode-aware rest: longest rest across the (super)set group, falling
+        // back to the fixed default when the backend hasn't supplied one.
+        const restPool = (groupExs.length > 0 ? groupExs : [exercise])
+          .map((ex) => ex.rest_seconds || 0)
+          .filter((s) => s > 0);
+        const restSecs = restPool.length > 0 ? Math.max(...restPool) : REST_DURATION_S;
+        setRestTimerEnd(Date.now() + restSecs * 1000);
         setRestTimerDone(false);
         if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
       }

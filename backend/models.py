@@ -21,6 +21,10 @@ class Exercise(BaseModel):
     rep_min: int | None = None
     rep_max: int | None = None
     is_amrap: bool = False
+    mode: str = ""  # raw Mode cell on input; resolved progression mode on output
+    set_min: int = 0
+    set_max: int = 0
+    rest_seconds: int = 0
 
 
 class WorkoutSession(BaseModel):

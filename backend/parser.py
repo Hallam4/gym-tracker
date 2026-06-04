@@ -38,6 +38,7 @@ def parse_structure_tab(rows: list[list[str]]) -> dict[str, list[Exercise]]:
     weight_col = col_map.get("weight", 4)
     target_col = col_map.get("target", 5)
     notes_col = col_map.get("notes", 6)
+    mode_col = col_map.get("mode")  # optional; absent -> mode inferred downstream
 
     result: dict[str, list[Exercise]] = {}
     current_type = ""
@@ -85,6 +86,7 @@ def parse_structure_tab(rows: list[list[str]]) -> dict[str, list[Exercise]]:
             notes_col=notes_col,
             sheet_row=i,
             superset_group=superset_group,
+            mode=_safe_get(row, mode_col) if mode_col is not None else "",
         )
 
         if current_type not in result:

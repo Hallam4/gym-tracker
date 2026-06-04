@@ -21,6 +21,10 @@ export interface Exercise {
   rep_min?: number | null;
   rep_max?: number | null;
   is_amrap?: boolean;
+  mode?: string;          // resolved progression mode: strength|evolve|volume|amrap
+  set_min?: number;
+  set_max?: number;
+  rest_seconds?: number;  // mode-aware rest timer duration
 }
 
 export interface WorkoutSession {

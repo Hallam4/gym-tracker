@@ -76,8 +76,19 @@ def _enrich_with_progression(session: WorkoutSession):
         ex.rep_min = rep_min
         ex.rep_max = rep_max
         ex.is_amrap = bool(ex.reps and ex.reps.upper() == "AMRAP") or bool(ex.target and ex.target.upper() == "AMRAP")
+
+        # Resolve progression mode (hybrid), set-range bounds, and rest timer.
+        mode = history.resolve_mode(ex.mode, rep_min, rep_max, ex.is_amrap)
+        set_min, set_max = history._parse_set_range(ex.sets)
+        if set_max == 0:
+            set_min, set_max = history.DEFAULT_SETS_BY_MODE.get(mode, (0, 0))
+        ex.mode = mode
+        ex.set_min = set_min
+        ex.set_max = set_max
+        ex.rest_seconds = history.REST_BY_MODE.get(mode, 240)
+
         current_target = int(ex.target) if ex.target and ex.target.isdigit() else rep_max
-        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target)
+        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target, mode=mode)
         if result:
             ex.suggested_weight = result["suggested_weight"]
             ex.suggested_target = result["suggested_target"]
@@ -165,9 +176,15 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
 
         for struct_ex in structure_exercises:
             rep_min, rep_max = _parse_rep_range(struct_ex.target, struct_ex.reps)
+            is_amrap = bool(struct_ex.reps and struct_ex.reps.upper() == "AMRAP") or bool(struct_ex.target and struct_ex.target.upper() == "AMRAP")
+            mode = history.resolve_mode(struct_ex.mode, rep_min, rep_max, is_amrap)
             current_target = int(struct_ex.target) if struct_ex.target and struct_ex.target.isdigit() else rep_max
-            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target)
+            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target, mode=mode)
             if not result:
+                continue
+            # Only evolve auto-writes back. strength is suggest-only; volume/amrap
+            # never chase weight.
+            if not history.auto_writes_weight(mode):
                 continue
             if result["sessions_at_ceiling"] >= history.CONFIRMATION_SESSIONS and result["suggested_weight"] and weight_col is not None:
                 updates.append({"row": struct_ex.sheet_row, "col": weight_col, "value": f"{result['suggested_weight']}kg"})
