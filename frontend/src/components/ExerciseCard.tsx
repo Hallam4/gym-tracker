@@ -86,7 +86,6 @@ export default function ExerciseCard({
   const suggestedWeight = exercise.suggested_weight;
   const prevWeight = exercise.prev_weight;
   const isWeightIncrease = suggestedWeight != null && prevWeight != null && parseFloat(suggestedWeight) > prevWeight;
-  const sessionsAtCeiling = exercise.sessions_at_ceiling ?? 0;
 
   useEffect(() => {
     if (isSkipped) {
@@ -239,24 +238,14 @@ export default function ExerciseCard({
               )}
             </div>
 
-            {/* Row 3: Progression signals */}
-            {sessionsAtCeiling > 0 && (
+            {/* Row 3: Progression signal — fires when you hit the top of the
+                rep range on all prescribed sets (single-session progression) */}
+            {isWeightIncrease && (
               <div className="mt-1">
-                {isWeightIncrease ? (
-                  <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
-                    <span aria-hidden="true">&#8593;</span>
-                    Weight up! Hit target {sessionsAtCeiling}x in a row
-                  </span>
-                ) : sessionsAtCeiling >= 2 ? (
-                  <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
-                    <span aria-hidden="true">&#9733;</span>
-                    Hit target {sessionsAtCeiling}x -- ready to go up
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[13px] text-yellow-400/80 px-2 py-0.5 bg-yellow-900/30 rounded-full">
-                    Hit target {sessionsAtCeiling}/2 sessions
-                  </span>
-                )}
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full">
+                  <span aria-hidden="true">&#8593;</span>
+                  Weight up! Hit your top reps
+                </span>
               </div>
             )}
           </div>

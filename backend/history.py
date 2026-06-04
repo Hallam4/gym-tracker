@@ -13,6 +13,12 @@ HISTORY_HEADER = [
     "Rest 1", "Rest 2", "Rest 3", "Rest 4", "Notes",
 ]
 
+# Consecutive working sessions at the rep ceiling required before suggesting a
+# weight increase. 1 = classic single-session double progression (bump as soon
+# as you hit the top of the range on all prescribed sets). Raise to 2+ to
+# require confirmation across sessions.
+CONFIRMATION_SESSIONS = 1
+
 
 def _safe_get(row: list[str], idx: int) -> str:
     if idx < len(row):
@@ -114,6 +120,23 @@ def _parse_reps(s: str) -> int:
         return int(s.strip())
     except (ValueError, AttributeError):
         return 0
+
+
+def _sets_at_ceiling(reps: list[int], prescribed: int, rep_max: int) -> bool:
+    """True if all *prescribed* (non-bonus) sets hit the rep ceiling.
+
+    Only the first `prescribed` sets are evaluated, so bonus/AMRAP sets logged
+    beyond the prescription (which are often lighter) can't block progression.
+    Falls back to evaluating every logged set when the prescribed count is
+    unknown (0 / unparseable).
+    """
+    if not reps:
+        return False
+    n = prescribed if prescribed > 0 else len(reps)
+    evaluated = reps[:n]
+    if not evaluated:
+        return False
+    return all(r >= rep_max for r in evaluated)
 
 
 def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
@@ -296,7 +319,13 @@ def compute_double_progression(
             if s
         ]
         weight = _parse_weight(row.weight)
-        recent_sessions.append({"date": d, "reps": set_reps, "weight": weight, "notes": row.notes})
+        recent_sessions.append({
+            "date": d,
+            "reps": set_reps,
+            "weight": weight,
+            "notes": row.notes,
+            "prescribed": _parse_reps(row.sets),
+        })
 
     # Filter deloads: auto-detect by weight threshold + manual [DELOAD] marker
     working_weight = max(s["weight"] for s in recent_sessions) if recent_sessions else 0
@@ -314,10 +343,11 @@ def compute_double_progression(
     prev_sets = prev["reps"]
     prev_weight = prev["weight"]
 
-    # Count consecutive working sessions at ceiling (all sets >= rep_max)
+    # Count consecutive working sessions at ceiling (prescribed sets >= rep_max,
+    # ignoring bonus sets logged beyond the prescription).
     sessions_at_ceiling = 0
     for sess in working_sessions:
-        if sess["reps"] and all(r >= rep_max for r in sess["reps"]):
+        if _sets_at_ceiling(sess["reps"], sess["prescribed"], rep_max):
             sessions_at_ceiling += 1
         else:
             break
@@ -327,14 +357,15 @@ def compute_double_progression(
     base_weight = working_sessions[0]["weight"]
     if current_target is None:
         current_target = rep_max
-    if sessions_at_ceiling >= 1:
+    if sessions_at_ceiling >= CONFIRMATION_SESSIONS:
         suggested_weight = str(base_weight + 2.5)
         suggested_target = str(rep_min)
     else:
         suggested_weight = str(base_weight) if base_weight > 0 else None
-        # Check if most recent working session hit current_target on all sets → bump target
+        # Bump target if the most recent working session hit current_target on
+        # all prescribed sets (bonus sets ignored, same as the ceiling check).
         latest = working_sessions[0]
-        if latest["reps"] and all(r >= current_target for r in latest["reps"]) and current_target < rep_max:
+        if _sets_at_ceiling(latest["reps"], latest["prescribed"], current_target) and current_target < rep_max:
             suggested_target = str(current_target + 1)
         else:
             suggested_target = str(current_target)

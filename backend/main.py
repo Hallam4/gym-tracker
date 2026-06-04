@@ -169,7 +169,7 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
             result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target)
             if not result:
                 continue
-            if result["sessions_at_ceiling"] >= 1 and result["suggested_weight"] and weight_col is not None:
+            if result["sessions_at_ceiling"] >= history.CONFIRMATION_SESSIONS and result["suggested_weight"] and weight_col is not None:
                 updates.append({"row": struct_ex.sheet_row, "col": weight_col, "value": f"{result['suggested_weight']}kg"})
             if target_col is not None and result["suggested_target"]:
                 updates.append({"row": struct_ex.sheet_row, "col": target_col, "value": result["suggested_target"]})

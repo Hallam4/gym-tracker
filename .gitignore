@@ -3,6 +3,7 @@ dist/
 .env
 __pycache__/
 *.pyc
+.pytest_cache/
 .vite/
 .DS_Store
 service-account.json
