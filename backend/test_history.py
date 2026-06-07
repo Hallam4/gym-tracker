@@ -136,6 +136,26 @@ def test_deload_session_excluded_from_working_weight():
     assert float(r["suggested_weight"]) == 82.5
 
 
+def test_old_heavy_session_does_not_resurrect_working_weight():
+    """Regression (live bench bug): a single old heavy session (e.g. a 1RM test)
+    in the lookback window must NOT push the deload threshold so high that the
+    real, sustained current working weight gets filtered out as a 'deload'.
+
+    Did 70kg for 3x10 across the last three sessions; an old 110kg single sits
+    further back. The suggestion must be based on the current 70kg, not the old
+    110kg (the original bug suggested 110kg)."""
+    rows = [
+        make_row("2026-02-05", 70, [10, 10, 10], 3),  # current working weight
+        make_row("2026-02-03", 70, [10, 10, 10], 3),
+        make_row("2026-02-01", 70, [10, 10, 10], 3),
+        make_row("2026-01-10", 110, [1], 3),          # old 1RM-style heavy single
+    ]
+    r = compute_double_progression("Bench", 8, 12, rows, current_target=10)
+    assert r["prev_weight"] == 70.0
+    assert float(r["suggested_weight"]) == 70.0  # NOT 110 (old heavy session)
+    assert r["suggested_target"] == "11"          # 3x10 hit target 10 -> push 11
+
+
 def test_helper_ignores_bonus_sets_directly():
     # Fixed sets (set_min == set_max): all prescribed sets must hit the ceiling,
     # bonus sets beyond set_max are ignored.

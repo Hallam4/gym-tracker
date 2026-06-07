@@ -417,8 +417,19 @@ def compute_double_progression(
             "set_max": set_max,
         })
 
-    # Filter deloads: auto-detect by weight threshold + manual [DELOAD] marker
-    working_weight = max(s["weight"] for s in recent_sessions) if recent_sessions else 0
+    # Filter deloads: auto-detect by weight threshold + manual [DELOAD] marker.
+    # Anchor the threshold to the lifter's CURRENT level — the most recent
+    # session that isn't a manual [DELOAD] — not the window maximum. A deload is
+    # a *temporary* dip you recover from; a sustained lower weight is your real
+    # working weight, not a deload. Referencing the window max meant an old heavy
+    # session (e.g. a 1RM test) raised the threshold enough to filter the real
+    # current sessions as "deloads", resurrecting the old weight and
+    # over-suggesting (did 70kg -> suggested 110kg).
+    current = next(
+        (s for s in recent_sessions if "[DELOAD]" not in (s.get("notes") or "")),
+        recent_sessions[0] if recent_sessions else {"weight": 0},
+    )
+    working_weight = current["weight"]
     deload_threshold = working_weight * 0.85
 
     working_sessions = [
