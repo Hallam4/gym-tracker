@@ -45,6 +45,10 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
   const soundIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const longPressRef = useRef<ReturnType<typeof setTimeout>>();
   const longPressFiredRef = useRef(false);
+  // Wall-clock (epoch ms) anchor for the session, read synchronously when a set
+  // is logged so set timestamps reflect real elapsed time regardless of whether
+  // the stopwatch is paused. Mirrored into sessionState for persistence.
+  const sessionStartedAtRef = useRef<number | null>(null);
   const queryClient = useQueryClient();
 
   // Session state stored in localStorage
@@ -55,6 +59,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     setTimes: {},
     timerSeconds: 0,
     timerRunning: false,
+    sessionStartedAt: null,
   });
   const { loadState, saveState, clearState } = useSessionPersist(selectedType);
   const initializedRef = useRef(false);
@@ -161,6 +166,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     setSessionState(saved);
     setTimerSeconds(saved.timerSeconds);
     setTimerRunning(saved.timerRunning);
+    sessionStartedAtRef.current = saved.sessionStartedAt ?? null;
     if (saved.restTimerEnd && saved.restTimerEnd > Date.now()) {
       setRestTimerEnd(saved.restTimerEnd);
       setRestTimerDone(false);
@@ -201,13 +207,15 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
   }, []);
 
   const switchToType = useCallback((t: string) => {
+    sessionStartedAtRef.current = null;
     setTimerSeconds(0); setTimerRunning(false); setGroupLastSetTime(new Map()); setSkippedExercises(new Set()); setIsDeload(false); setRestTimerEnd(null); setRestCountdown(null); setRestTimerDone(false); setHeaderExpanded(false); setPendingTypeSwitch(null); setSelectedType(t);
     if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
   }, []);
 
   const handleWorkoutReset = useCallback(() => {
     clearState();
-    setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false });
+    sessionStartedAtRef.current = null;
+    setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false, sessionStartedAt: null });
     setTimerSeconds(0);
     setTimerRunning(false);
     setGroupLastSetTime(new Map());
@@ -248,8 +256,16 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
 
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
-      // Auto-start timer on first set tap
-      if (!timerRunning && timerSeconds === 0) setTimerRunning(true);
+      // Anchor the session start (wall-clock) on the first logged set so set
+      // timestamps are pause-proof, and auto-resume the stopwatch on every set
+      // so it can never be left silently paused mid-workout (which previously
+      // froze all subsequent set timestamps at one value).
+      if (sessionStartedAtRef.current == null) {
+        const anchor = Date.now();
+        sessionStartedAtRef.current = anchor;
+        updateSessionState((prev) => ({ ...prev, sessionStartedAt: anchor }));
+      }
+      if (!timerRunning) setTimerRunning(true);
       updateSessionState((prev) => {
         const results = { ...prev.setResults };
         const exSets = [...(results[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
@@ -327,10 +343,19 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
 
   const handleSetTimeCapture = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, time: number | null) => {
+      // Ignore the pausable stopwatch value the card passes; derive the timestamp
+      // from the wall-clock session anchor so a paused timer can never freeze it.
+      // `null` is an undo and is preserved as-is.
+      const stamp =
+        time === null
+          ? null
+          : sessionStartedAtRef.current != null
+            ? Math.round((Date.now() - sessionStartedAtRef.current) / 1000)
+            : 0;
       updateSessionState((prev) => {
         const times = { ...prev.setTimes };
         const exTimes = [...(times[exercise.name] || Array.from({ length: MAX_SETS }, () => null))];
-        exTimes[setIndex] = time;
+        exTimes[setIndex] = stamp;
         times[exercise.name] = exTimes;
         return { ...prev, setTimes: times };
       });
@@ -785,7 +810,8 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
             setRestTimerEnd(null);
             setRestCountdown(null);
             setRestTimerDone(false);
-            setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false });
+            sessionStartedAtRef.current = null;
+            setSessionState({ setResults: {}, weights: {}, notes: {}, setTimes: {}, timerSeconds: 0, timerRunning: false, sessionStartedAt: null });
             if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
           }}
         />

@@ -8,6 +8,7 @@ export interface SessionState {
   timerSeconds: number;
   timerRunning: boolean;
   restTimerEnd?: number | null; // absolute timestamp (ms) when rest countdown expires
+  sessionStartedAt?: number | null; // wall-clock (epoch ms) anchor for set timestamps
 }
 
 const EMPTY_STATE: SessionState = {
@@ -17,6 +18,7 @@ const EMPTY_STATE: SessionState = {
   setTimes: {},
   timerSeconds: 0,
   timerRunning: false,
+  sessionStartedAt: null,
 };
 
 function storageKey(type: string): string {
