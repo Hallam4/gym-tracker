@@ -53,10 +53,10 @@ function saveLog(log: LogEntry[]) {
   localStorage.setItem(LOG_KEY, JSON.stringify(log));
 }
 
-function playBeep() {
+function playBeep(count = 3, vibratePattern: number[] = [200, 100, 200, 100, 200]) {
   try {
     const ctx = new AudioContext();
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < count; i++) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -67,7 +67,7 @@ function playBeep() {
       osc.stop(ctx.currentTime + i * 0.15 + 0.1);
     }
   } catch { /* silent fail */ }
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+  if (navigator.vibrate) navigator.vibrate(vibratePattern);
 }
 
 export default function PrehabTab() {
@@ -80,13 +80,28 @@ export default function PrehabTab() {
   const [restCountdown, setRestCountdown] = useState<number | null>(null);
   const [restDone, setRestDone] = useState(false);
   const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const soundInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearRestTimer = useCallback(() => {
     if (restInterval.current) clearInterval(restInterval.current);
     restInterval.current = null;
+    if (soundInterval.current) clearInterval(soundInterval.current);
+    soundInterval.current = null;
     setRestEnd(null);
     setRestCountdown(null);
     setRestDone(false);
+  }, []);
+
+  // Tap the full-screen GO overlay to dismiss: stop the repeating alert and hide it
+  const dismissGo = useCallback(() => {
+    if (soundInterval.current) clearInterval(soundInterval.current);
+    soundInterval.current = null;
+    setRestDone(false);
+  }, []);
+
+  // Stop any repeating alert if the tab unmounts
+  useEffect(() => () => {
+    if (soundInterval.current) clearInterval(soundInterval.current);
   }, []);
 
   // Countdown interval
@@ -100,8 +115,13 @@ export default function PrehabTab() {
         restInterval.current = null;
         setRestEnd(null);
         setRestDone(true);
+        // Initial alert
         playBeep();
-        setTimeout(() => setRestDone(false), 2000);
+        // Repeat 2 beeps + vibrate every 3s until dismissed (parity with Today's Workout)
+        if (soundInterval.current) clearInterval(soundInterval.current);
+        soundInterval.current = setInterval(() => {
+          playBeep(2, [200, 100, 200]);
+        }, 3000);
       }
     };
     tick();
@@ -158,6 +178,18 @@ export default function PrehabTab() {
 
   return (
     <div>
+      {restDone && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center go-overlay-pulse"
+          onClick={dismissGo}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="text-7xl font-black text-green-400 go-text-pulse">GO</div>
+          <div className="text-sm text-gray-400 mt-4">tap to dismiss</div>
+        </div>
+      )}
+
       <h2 className="text-lg font-bold text-white mb-4">Prehab</h2>
 
       {/* Segmented toggle */}
