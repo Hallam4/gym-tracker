@@ -45,6 +45,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
   const soundIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const longPressRef = useRef<ReturnType<typeof setTimeout>>();
   const longPressFiredRef = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   // Wall-clock (epoch ms) anchor for the session, read synchronously when a set
   // is logged so set timestamps reflect real elapsed time regardless of whether
   // the stopwatch is paused. Mirrored into sessionState for persistence.
@@ -102,21 +103,39 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
     };
   }, [hasAnySets]);
 
+  const initAudioCtx = useCallback(() => {
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioContext();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    } catch {}
+  }, []);
+
   const playAlertBeeps = useCallback((count: number, freqHz: number, durationMs: number, gapMs: number) => {
     try {
-      const ctx = new AudioContext();
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      gain.gain.value = 0.4;
-      for (let i = 0; i < count; i++) {
-        const osc = ctx.createOscillator();
-        osc.connect(gain);
-        osc.frequency.value = freqHz;
-        const startTime = ctx.currentTime + i * (durationMs + gapMs) / 1000;
-        osc.start(startTime);
-        osc.stop(startTime + durationMs / 1000);
+      const ctx = audioCtxRef.current;
+      if (!ctx || ctx.state === 'closed') return;
+      const play = () => {
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        gain.gain.value = 0.4;
+        for (let i = 0; i < count; i++) {
+          const osc = ctx.createOscillator();
+          osc.connect(gain);
+          osc.frequency.value = freqHz;
+          const startTime = ctx.currentTime + i * (durationMs + gapMs) / 1000;
+          osc.start(startTime);
+          osc.stop(startTime + durationMs / 1000);
+        }
+      };
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(play).catch(() => {});
+      } else {
+        play();
       }
-      setTimeout(() => ctx.close(), count * (durationMs + gapMs) + 500);
     } catch {}
   }, []);
 
@@ -256,6 +275,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
 
   const handleSetComplete = useCallback(
     (exercise: WorkoutSession["exercises"][0], setIndex: number, reps: number) => {
+      initAudioCtx();
       // Anchor the session start (wall-clock) on the first logged set so set
       // timestamps are pause-proof, and auto-resume the stopwatch on every set
       // so it can never be left silently paused mid-workout (which previously
@@ -305,7 +325,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
         if (restDoneTimerRef.current) clearTimeout(restDoneTimerRef.current);
       }
     },
-    [timerSeconds, updateSessionState, session?.exercises, sessionState.setResults]
+    [timerSeconds, updateSessionState, session?.exercises, sessionState.setResults, initAudioCtx]
   );
 
   const handleSetUndo = useCallback(
@@ -593,7 +613,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
       {/* Unified timer display — sticky so it's visible during later exercises */}
       <div className={`flex items-center justify-center mb-3 ${restTimerEnd ? "sticky top-0 z-20 py-2 -mx-4 px-4 bg-gray-950/90 backdrop-blur-sm" : ""}`}>
         <button
-          onClick={() => { if (!longPressFiredRef.current) setTimerRunning((r) => !r); }}
+          onClick={() => { initAudioCtx(); if (!longPressFiredRef.current) setTimerRunning((r) => !r); }}
           onTouchStart={handleTimerLongPressStart}
           onTouchEnd={handleTimerLongPressEnd}
           onMouseDown={handleTimerLongPressStart}
