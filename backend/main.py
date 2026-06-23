@@ -88,7 +88,7 @@ def _enrich_with_progression(session: WorkoutSession):
         ex.rest_seconds = history.REST_BY_MODE.get(mode, 240)
 
         current_target = int(ex.target) if ex.target and ex.target.isdigit() else rep_max
-        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target, mode=mode)
+        result = history.compute_double_progression(ex.name, rep_min, rep_max, all_history, current_target, mode=mode, day_label=session.day)
         if result:
             ex.suggested_weight = result["suggested_weight"]
             ex.suggested_target = result["suggested_target"]
@@ -154,7 +154,7 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
                 superset_group=0,
             ))
 
-        summaries = history.compute_workout_summary(summary_exercises, today)
+        summaries = history.compute_workout_summary(summary_exercises, today, day_label=req.day)
         history.append_completed_workout(req.day, req.exercises, req.is_deload)
 
         # Update Structure weight/target if double-progression fires
@@ -179,7 +179,7 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
             is_amrap = bool(struct_ex.reps and struct_ex.reps.upper() == "AMRAP") or bool(struct_ex.target and struct_ex.target.upper() == "AMRAP")
             mode = history.resolve_mode(struct_ex.mode, rep_min, rep_max, is_amrap)
             current_target = int(struct_ex.target) if struct_ex.target and struct_ex.target.isdigit() else rep_max
-            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target, mode=mode)
+            result = history.compute_double_progression(struct_ex.name, rep_min, rep_max, all_history, current_target, mode=mode, day_label=req.day)
             if not result:
                 continue
             # Only evolve auto-writes back. strength is suggest-only; volume/amrap

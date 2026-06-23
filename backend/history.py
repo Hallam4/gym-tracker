@@ -309,12 +309,25 @@ def get_prs() -> list[PREntry]:
     return prs
 
 
-def compute_workout_summary(exercises: list[Exercise], today_date: str) -> list[ExerciseSummary]:
+def compute_workout_summary(
+    exercises: list[Exercise],
+    today_date: str,
+    day_label: str | None = None,
+    history_rows: list[HistoryRow] | None = None,
+) -> list[ExerciseSummary]:
     """Compute per-exercise summary comparing current session to prior history.
 
     Must be called BEFORE append_workout so current session isn't in history.
+
+    When `day_label` is set, the prior comparison is scoped to that session, so a
+    light Arms OHP isn't measured against the heavy Upper 1 OHP (which would show
+    a false weight drop and suppress Arms PRs). `history_rows` injects the prior
+    log for testing; it defaults to the full History tab.
     """
-    history = get_all_history()
+    history = history_rows if history_rows is not None else get_all_history()
+    if day_label:
+        wanted = _CODE_TO_LABEL.get(day_label, day_label)
+        history = [r for r in history if r.day == wanted]
 
     # Build per-exercise prior data: best weight, best 1RM, most recent weight
     prior: dict[str, dict] = {}
@@ -370,6 +383,7 @@ def compute_double_progression(
     history_rows: list[HistoryRow],
     current_target: int | None = None,
     mode: str = DEFAULT_MODE,
+    day_label: str | None = None,
 ) -> dict | None:
     """Compute suggested weight/target for an exercise from its history.
 
@@ -382,10 +396,19 @@ def compute_double_progression(
 
     Per-session set ranges are read from each history row's Sets cell, so a
     session is judged against the prescription that was in force at the time.
+
+    When `day_label` is given, history is scoped to that session (matching the
+    History tab's Day column) so the same exercise in another session — with a
+    different purpose/weight — can't contaminate the suggestion. It accepts both
+    a short code (U1/Arm) and the stored long label (Upper 1/Arms). When omitted,
+    all sessions for the exercise are pooled (legacy behaviour).
     Returns None if no history exists (use sheet defaults).
     """
     name_lower = exercise_name.lower()
     matching = [r for r in history_rows if r.exercise.lower() == name_lower]
+    if day_label:
+        wanted = _CODE_TO_LABEL.get(day_label, day_label)
+        matching = [r for r in matching if r.day == wanted]
     if not matching:
         return None
 

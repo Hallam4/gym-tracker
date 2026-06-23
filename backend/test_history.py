@@ -10,11 +10,11 @@ import pytest
 
 import history
 from history import compute_double_progression, CONFIRMATION_SESSIONS
-from models import HistoryRow
+from models import Exercise, HistoryRow
 
 
 def make_row(date: str, weight: float, reps: list[int], prescribed, notes: str = "",
-             exercise: str = "Bench") -> HistoryRow:
+             exercise: str = "Bench", day: str = "Upper 1") -> HistoryRow:
     """Build a HistoryRow with up to 5 sets.
 
     `prescribed` -> the Sets column; accepts an int (e.g. 4) or a range string
@@ -22,10 +22,20 @@ def make_row(date: str, weight: float, reps: list[int], prescribed, notes: str =
     """
     sets = [str(r) for r in reps] + [""] * (5 - len(reps))
     return HistoryRow(
-        date=date, day="Upper 1", exercise=exercise, weight=f"{weight}kg",
+        date=date, day=day, exercise=exercise, weight=f"{weight}kg",
         sets=str(prescribed),
         set1=sets[0], set2=sets[1], set3=sets[2], set4=sets[3], set5=sets[4],
         rest1="", rest2="", rest3="", rest4="", notes=notes,
+    )
+
+
+def make_ex(name: str, weight: float, set_results: list[str],
+            reps: str = "8-12", sets: str = "3", target: str = "12") -> Exercise:
+    """Build a current-session Exercise (the shape compute_workout_summary takes)."""
+    return Exercise(
+        name=name, reps=reps, sets=sets, weight=f"{weight}kg", target=target,
+        set_results=set_results, rest_times=[], notes="",
+        sheet_row=0, superset_group=0,
     )
 
 
@@ -279,3 +289,85 @@ def test_auto_writes_weight_only_for_evolve():
     assert history.auto_writes_weight("strength") is False
     assert history.auto_writes_weight("volume") is False
     assert history.auto_writes_weight("amrap") is False
+
+
+# --- session scoping ------------------------------------------------------
+# The same exercise can live in two sessions with different purposes (e.g. OHP
+# as a heavy press in Upper 1 and a light pump in Arms). Progression must be
+# scoped to the session so the two slots don't contaminate each other.
+
+def test_progression_scoped_to_session_ignores_other_sessions():
+    """Regression: OHP is a heavy press in Upper 1 (60kg) and a light 12-rep pump
+    in Arms (30kg). The Arms suggestion must be anchored to the 30kg Arms work,
+    not the heavier Upper 1 sessions — otherwise the lighter slot inherits a
+    wildly too-heavy weight."""
+    rows = [
+        make_row("2026-03-10", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-08", 30, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+        make_row("2026-03-03", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-01", 30, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+    ]
+    r = compute_double_progression("OHP", 8, 12, rows, current_target=12, day_label="Arms")
+    assert r["prev_weight"] == 30.0
+    assert float(r["suggested_weight"]) == 32.5  # 30 + 2.5, from Arms ceiling only
+
+
+def test_progression_scoping_accepts_short_code():
+    """day_label accepts the short code too — the callers pass wtype / req.day
+    (e.g. "Arm"), which must resolve to the stored long label ("Arms")."""
+    rows = [
+        make_row("2026-03-10", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-08", 30, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+    ]
+    r = compute_double_progression("OHP", 8, 12, rows, current_target=12, day_label="Arm")
+    assert r["prev_weight"] == 30.0  # resolved "Arm" -> "Arms", Upper 1 ignored
+
+
+def test_progression_without_day_label_pools_all_sessions():
+    """Backward compat: omitting day_label preserves the old name-only pooling,
+    so existing callers are unaffected until they opt in. Here the most recent
+    session is the 60kg Upper 1 work; the 30kg Arms sets fall below the deload
+    threshold and are dropped, so the suggestion is (wrongly) anchored to 60kg —
+    exactly the behaviour the day_label fix exists to override."""
+    rows = [
+        make_row("2026-03-10", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-08", 30, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+        make_row("2026-03-03", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-01", 30, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+    ]
+    r = compute_double_progression("OHP", 8, 12, rows, current_target=12)
+    assert r["prev_weight"] == 60.0
+    assert float(r["suggested_weight"]) == 60.0
+
+
+# --- workout summary scoping ----------------------------------------------
+# compute_workout_summary drives the post-workout "vs previous / new PR" panel.
+# It must compare like-for-like within a session, or a light Arms OHP looks like
+# a huge weight drop vs the heavy Upper 1 OHP and never registers an Arms PR.
+
+def test_workout_summary_scoped_to_session():
+    prior = [
+        make_row("2026-03-10", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-08", 27.5, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+    ]
+    current = [make_ex("OHP", 30, ["12", "12", "12"])]  # today's Arms OHP — an Arms PR
+    summaries = history.compute_workout_summary(
+        current, "2026-03-12", day_label="Arms", history_rows=prior
+    )
+    s = summaries[0]
+    assert s.prev_weight == 27.5    # vs prior Arms work, not the 60kg Upper 1
+    assert s.weight_change == 2.5   # 30 - 27.5
+    assert s.is_weight_pr is True   # beats best Arms (pooled it'd be False vs 60kg)
+
+
+def test_workout_summary_without_day_label_pools_all_sessions():
+    """Backward compat: omitting day_label keeps the old name-only comparison."""
+    prior = [
+        make_row("2026-03-10", 60, [5, 5, 5], 3, exercise="OHP", day="Upper 1"),
+        make_row("2026-03-08", 27.5, [12, 12, 12], 3, exercise="OHP", day="Arms"),
+    ]
+    current = [make_ex("OHP", 30, ["12", "12", "12"])]
+    summaries = history.compute_workout_summary(current, "2026-03-12", history_rows=prior)
+    s = summaries[0]
+    assert s.prev_weight == 60.0    # most recent OHP overall is the 60kg Upper 1
+    assert s.is_weight_pr is False  # 30 < 60
