@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PREHAB_SECTIONS } from "../data/prehabData";
 import {
   emptyDayState, rollIfNewDay, isExerciseDone,
-  sectionProgress, overallProgress, buildLogEntry, appendLog,
+  sectionProgress, overallProgress, buildLogEntry,
 } from "./prehabSession";
 
 const antDelt = PREHAB_SECTIONS[0].exercises[0]; // sets: 5
@@ -48,12 +48,4 @@ describe("prehabSession", () => {
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
-  it("appendLog prepends and dedupes by date", () => {
-    const a = buildLogEntry({ date: "2026-06-28", entries: {} });
-    const b = buildLogEntry({ date: "2026-06-29", entries: {} });
-    const b2 = buildLogEntry({ date: "2026-06-29", entries: { "single-leg-stand": { setsDone: 1 } } });
-    const log = appendLog(appendLog([a], b), b2);
-    expect(log.map((e) => e.date)).toEqual(["2026-06-29", "2026-06-28"]);
-    expect(log[0].done).toBe(1);
-  });
 });

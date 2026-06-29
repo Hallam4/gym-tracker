@@ -60,6 +60,3 @@ export function buildLogEntry(state: DayState): LogEntry {
   return { date: state.date, done: overall.done, total: overall.total, sections };
 }
 
-export function appendLog(log: LogEntry[], entry: LogEntry): LogEntry[] {
-  return [entry, ...log.filter((e) => e.date !== entry.date)];
-}

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  DayState, LogEntry, emptyDayState, rollIfNewDay, buildLogEntry, appendLog,
-} from "../lib/prehabSession";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, PrehabCompleteRequest } from "../api/gym";
+import { DayState, LogEntry, emptyDayState, rollIfNewDay, buildLogEntry } from "../lib/prehabSession";
 
 const DAY_KEY = "gym-prehab-v2-today";
-const LOG_KEY = "gym-prehab-v2-log";
-
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export function usePrehabSession() {
+  const queryClient = useQueryClient();
+
+  // In-progress day state stays in localStorage.
   const [day, setDay] = useState<DayState>(() => {
     try {
       const raw = localStorage.getItem(DAY_KEY);
@@ -17,39 +18,44 @@ export function usePrehabSession() {
     return emptyDayState(todayStr());
   });
 
-  const [log, setLog] = useState<LogEntry[]>(() => {
-    try {
-      const raw = localStorage.getItem(LOG_KEY);
-      if (raw) return JSON.parse(raw) as LogEntry[];
-    } catch { /* ignore */ }
-    return [];
-  });
-
   useEffect(() => {
     try { localStorage.setItem(DAY_KEY, JSON.stringify(day)); } catch { /* ignore */ }
   }, [day]);
 
-  useEffect(() => {
-    try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch { /* ignore */ }
-  }, [log]);
+  // Completed-session log comes from the backend.
+  const { data: log = [] } = useQuery({
+    queryKey: ["prehab-history"],
+    queryFn: () => api.getPrehabHistory().then((r) => r.sessions as LogEntry[]),
+  });
+
+  const mutation = useMutation({
+    // buildLogEntry(day) is structurally a PrehabCompleteRequest; the cast bridges
+    // LogEntry's SectionId-keyed record to the API's string-keyed record.
+    mutationFn: () => api.completePrehab(buildLogEntry(day) as PrehabCompleteRequest),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prehab-history"] }),
+  });
 
   const setSetsDone = useCallback((exId: string, setsDone: number) => {
-    setDay((d) => ({
-      ...d,
-      entries: { ...d.entries, [exId]: { ...d.entries[exId], setsDone } },
-    }));
+    setDay((d) => ({ ...d, entries: { ...d.entries, [exId]: { ...d.entries[exId], setsDone } } }));
   }, []);
 
   const setWeight = useCallback((exId: string, weight: string) => {
     setDay((d) => ({
       ...d,
-      entries: { ...d.entries, [exId]: { setsDone: d.entries[exId]?.setsDone ?? 0, weight } },
+      entries: { ...d.entries, [exId]: { ...d.entries[exId], setsDone: d.entries[exId]?.setsDone ?? 0, weight } },
     }));
   }, []);
 
-  const completeSession = useCallback(() => {
-    setLog((l) => appendLog(l, buildLogEntry(day)));
-  }, [day]);
+  const completeSession = useCallback(() => { mutation.mutate(); }, [mutation]);
 
-  return { day, log, setSetsDone, setWeight, completeSession };
+  return {
+    day,
+    log,
+    setSetsDone,
+    setWeight,
+    completeSession,
+    isSaving: mutation.isPending,
+    isSaved: mutation.isSuccess,
+    saveError: mutation.isError,
+  };
 }
