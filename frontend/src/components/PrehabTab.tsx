@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PREHAB_SECTIONS, SectionId, PrehabExercise } from "../data/prehabData";
 import { usePrehabSession } from "../hooks/usePrehabSession";
 import { useSessionTimer } from "../hooks/useSessionTimer";
@@ -21,6 +21,15 @@ export default function PrehabTab() {
     proprioception: false,
   });
   const [errorDismissed, setErrorDismissed] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  // Show "Saved!" briefly after a successful save, then revert (mutation.isSuccess stays true).
+  useEffect(() => {
+    if (!isSaved) return;
+    setJustSaved(true);
+    const t = setTimeout(() => setJustSaved(false), 2000);
+    return () => clearTimeout(t);
+  }, [isSaved]);
 
   const overall = overallProgress(day);
   const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0;
@@ -82,14 +91,14 @@ export default function PrehabTab() {
         onClick={handleComplete}
         disabled={overall.done === 0 || isSaving}
         className={`w-full mt-4 py-4 rounded-2xl font-bold text-lg touch-target transition-all duration-200 active:scale-[0.98] ${
-          isSaved && !isSaving
+          justSaved
             ? "bg-green-600 text-white"
             : overall.done === 0 || isSaving
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-700/25 hover:brightness-110"
         }`}
       >
-        {isSaving ? "Saving…" : isSaved ? "Saved!" : `Complete Session (${overall.done}/${overall.total})`}
+        {isSaving ? "Saving…" : justSaved ? "Saved!" : `Complete Session (${overall.done}/${overall.total})`}
       </button>
 
       {/* Recent log */}
