@@ -1,342 +1,107 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
+import { PREHAB_SECTIONS, SectionId, PrehabExercise } from "../data/prehabData";
+import { usePrehabSession } from "../hooks/usePrehabSession";
+import { useSessionTimer } from "../hooks/useSessionTimer";
+import { overallProgress, sectionProgress } from "../lib/prehabSession";
+import SessionTimer from "./SessionTimer";
+import PrehabSection from "./PrehabSection";
 
-type SubView = "warmup" | "rehab" | "proprioception";
+const TIMER_KEY = "gym-prehab-v2-timer";
 
-interface Exercise {
-  name: string;
-  prescription: string;
-}
-
-interface LogEntry {
-  date: string;
-  type: SubView;
-  completed: number;
-  total: number;
-}
-
-const WARMUP_EXERCISES: Exercise[] = [
-  { name: "Band Pull-Aparts", prescription: "2x20" },
-  { name: "Band ER (arm at side)", prescription: "2x15 each arm" },
-  { name: "Wall Slides", prescription: "2x12" },
-  { name: "Band Dislocates", prescription: "2x10" },
-  { name: "Scapular Push-Ups", prescription: "1x15" },
-  { name: "Light Face Pulls", prescription: "1x15" },
-];
-
-const REHAB_EXERCISES: Exercise[] = [
-  { name: "Side-lying External Rotation", prescription: "3x15-20" },
-  { name: "Band ER at 90/90", prescription: "2-3x12-15" },
-  { name: "Band Internal Rotation", prescription: "3x15-20" },
-  { name: "Prone Y-T-W Raises", prescription: "2-3x10-12 each" },
-  { name: "Ball-on-Wall Circles", prescription: "3x30-45s each direction" },
-];
-
-const PROPRIOCEPTION_EXERCISES: Exercise[] = [
-  { name: "Single Leg Stand — Eyes Open", prescription: "30-60s each leg" },
-  { name: "Single Leg Stand — Eyes Closed", prescription: "30-60s each leg" },
-  { name: "Single Leg Stand — Cushion, Eyes Open", prescription: "30-60s each leg" },
-  { name: "Single Leg Stand — Cushion, Eyes Closed", prescription: "30-60s each leg" },
-  { name: "Single Leg Stand — Eyes Closed, Head Turning", prescription: "30-60s each leg" },
-];
-
-const LOG_KEY = "gym-prehab-log";
-
-function loadLog(): LogEntry[] {
-  try {
-    const raw = localStorage.getItem(LOG_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveLog(log: LogEntry[]) {
-  localStorage.setItem(LOG_KEY, JSON.stringify(log));
-}
-
-function playBeep(count = 3, vibratePattern: number[] = [200, 100, 200, 100, 200]) {
-  try {
-    const ctx = new AudioContext();
-    for (let i = 0; i < count; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.value = 0.3;
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.1);
-    }
-  } catch { /* silent fail */ }
-  if (navigator.vibrate) navigator.vibrate(vibratePattern);
-}
+const fmtDate = (iso: string) =>
+  new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default function PrehabTab() {
-  const [subView, setSubView] = useState<SubView>("warmup");
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [log, setLog] = useState<LogEntry[]>(loadLog);
+  const { day, log, setSetsDone, setWeight, completeSession } = usePrehabSession();
+  const timer = useSessionTimer(TIMER_KEY);
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({
+    shoulders: true,
+    lowerback: false,
+    proprioception: false,
+  });
   const [justSaved, setJustSaved] = useState(false);
 
-  const [restEnd, setRestEnd] = useState<number | null>(null);
-  const [restCountdown, setRestCountdown] = useState<number | null>(null);
-  const [restDone, setRestDone] = useState(false);
-  const restInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const soundInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const overall = overallProgress(day);
+  const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0;
 
-  const clearRestTimer = useCallback(() => {
-    if (restInterval.current) clearInterval(restInterval.current);
-    restInterval.current = null;
-    if (soundInterval.current) clearInterval(soundInterval.current);
-    soundInterval.current = null;
-    setRestEnd(null);
-    setRestCountdown(null);
-    setRestDone(false);
-  }, []);
+  // Look up an exercise to decide whether logging a set should start a rest.
+  const exById = (exId: string): PrehabExercise | undefined =>
+    PREHAB_SECTIONS.flatMap((s) => s.exercises).find((e) => e.id === exId);
 
-  // Tap the full-screen GO overlay to dismiss: stop the repeating alert and hide it
-  const dismissGo = useCallback(() => {
-    if (soundInterval.current) clearInterval(soundInterval.current);
-    soundInterval.current = null;
-    setRestDone(false);
-  }, []);
-
-  // Stop any repeating alert if the tab unmounts
-  useEffect(() => () => {
-    if (soundInterval.current) clearInterval(soundInterval.current);
-  }, []);
-
-  // Countdown interval
-  useEffect(() => {
-    if (restEnd === null) return;
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
-      setRestCountdown(remaining);
-      if (remaining <= 0) {
-        if (restInterval.current) clearInterval(restInterval.current);
-        restInterval.current = null;
-        setRestEnd(null);
-        setRestDone(true);
-        // Initial alert
-        playBeep();
-        // Repeat 2 beeps + vibrate every 3s until dismissed (parity with Today's Workout)
-        if (soundInterval.current) clearInterval(soundInterval.current);
-        soundInterval.current = setInterval(() => {
-          playBeep(2, [200, 100, 200]);
-        }, 3000);
-      }
-    };
-    tick();
-    restInterval.current = setInterval(tick, 200);
-    return () => {
-      if (restInterval.current) clearInterval(restInterval.current);
-      restInterval.current = null;
-    };
-  }, [restEnd]);
-
-  const handleRestTap = () => {
-    if (restDone) return;
-    if (restEnd !== null) {
-      clearRestTimer();
-    } else {
-      setRestEnd(Date.now() + 30_000);
+  const handleSetsDone = (exId: string, setsDone: number) => {
+    const prev = day.entries[exId]?.setsDone ?? 0;
+    setSetsDone(exId, setsDone);
+    const ex = exById(exId);
+    // Start rest only when logging a NEW set (count went up) on loaded/reps moves.
+    if (ex && setsDone > prev && (ex.kind === "loaded" || ex.kind === "reps")) {
+      timer.startRest();
     }
   };
 
-  const exercises = subView === "warmup" ? WARMUP_EXERCISES : subView === "rehab" ? REHAB_EXERCISES : PROPRIOCEPTION_EXERCISES;
-
-  // Reset checks when switching sub-view
-  useEffect(() => {
-    setChecked({});
-    setJustSaved(false);
-  }, [subView]);
-
-  const completedCount = exercises.filter((e) => checked[e.name]).length;
-
   const handleComplete = () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const entry: LogEntry = {
-      date: today,
-      type: subView,
-      completed: completedCount,
-      total: exercises.length,
-    };
-
-    setLog((prev) => {
-      // Dedup: overwrite same (date, type)
-      const filtered = prev.filter(
-        (e) => !(e.date === today && e.type === subView)
-      );
-      const next = [entry, ...filtered];
-      saveLog(next);
-      return next;
-    });
-
+    completeSession();
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
   };
 
-  const recentLog = log.slice(0, 20);
-
   return (
     <div>
-      {restDone && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center go-overlay-pulse"
-          onClick={dismissGo}
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="text-7xl font-black text-green-400 go-text-pulse">GO</div>
-          <div className="text-sm text-gray-400 mt-4">tap to dismiss</div>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-bold text-white">Daily Prehab</h2>
+        <span className="text-xs text-gray-500">{fmtDate(day.date)}</span>
+      </div>
+
+      <SessionTimer timer={timer} />
+
+      {/* Overall progress */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow={overall.done} aria-valuemin={0} aria-valuemax={overall.total}>
+          <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
-      )}
-
-      <h2 className="text-lg font-bold text-white mb-4">Prehab</h2>
-
-      {/* Segmented toggle */}
-      <div className="flex gap-1 bg-gray-800/60 rounded-xl p-1 mb-5">
-        {(["warmup", "rehab", "proprioception"] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => setSubView(v)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              subView === v
-                ? "bg-gray-700 text-white shadow-sm"
-                : "text-gray-400 hover:text-gray-300"
-            }`}
-          >
-            {v === "warmup" ? "Warm-Up" : v === "rehab" ? "Rehab" : "Proprio"}
-          </button>
-        ))}
+        <span className={`text-xs tabular-nums ${pct >= 100 ? "text-green-400" : "text-gray-300"}`}>
+          {overall.done}/{overall.total}
+        </span>
       </div>
 
-      {/* Rest timer button */}
-      <div className="sticky top-0 z-20 backdrop-blur-sm pb-3">
-        <button
-          onClick={handleRestTap}
-          className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
-            restDone
-              ? "bg-green-600 text-white animate-pulse"
-              : restEnd !== null
-              ? "bg-blue-600 text-white"
-              : "bg-gray-800/60 text-gray-400 ring-1 ring-gray-700/30"
-          }`}
-        >
-          {restDone
-            ? "GO"
-            : restEnd !== null
-            ? `0:${String(restCountdown ?? 0).padStart(2, "0")}`
-            : "Rest 0:30"}
-        </button>
-      </div>
+      {/* Sections */}
+      {PREHAB_SECTIONS.map((section) => (
+        <PrehabSection
+          key={section.id}
+          section={section}
+          day={day}
+          progress={sectionProgress(section.id, day)}
+          open={open[section.id]}
+          onToggle={() => setOpen((o) => ({ ...o, [section.id]: !o[section.id] }))}
+          onSetsDone={handleSetsDone}
+          onWeightChange={setWeight}
+        />
+      ))}
 
-      {/* Exercise list */}
-      <div className="space-y-2 mb-5">
-        {exercises.map((ex) => (
-          <button
-            key={ex.name}
-            onClick={() =>
-              setChecked((prev) => ({ ...prev, [ex.name]: !prev[ex.name] }))
-            }
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 active:scale-[0.98] ${
-              checked[ex.name]
-                ? "bg-green-900/30 ring-1 ring-green-700/50"
-                : "bg-gray-800/60 ring-1 ring-gray-700/30"
-            }`}
-          >
-            <div className="text-left">
-              <div
-                className={`text-sm font-medium ${
-                  checked[ex.name] ? "text-green-300" : "text-gray-200"
-                }`}
-              >
-                {ex.name}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {ex.prescription}
-              </div>
-            </div>
-            <div
-              className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors duration-200 ${
-                checked[ex.name]
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-700 text-gray-500"
-              }`}
-            >
-              {checked[ex.name] && (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Complete button */}
+      {/* Complete */}
       <button
         onClick={handleComplete}
-        disabled={completedCount === 0}
-        className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
+        disabled={overall.done === 0}
+        className={`w-full mt-4 py-4 rounded-2xl font-bold text-lg touch-target transition-all duration-200 active:scale-[0.98] ${
           justSaved
             ? "bg-green-600 text-white"
-            : completedCount === 0
-            ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-            : "bg-blue-600 text-white hover:brightness-110"
+            : overall.done === 0
+              ? "bg-gray-800 text-gray-600 cursor-not-allowed"
+              : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-700/25 hover:brightness-110"
         }`}
       >
-        {justSaved
-          ? "Saved!"
-          : `Complete Session (${completedCount}/${exercises.length})`}
+        {justSaved ? "Saved!" : `Complete Session (${overall.done}/${overall.total})`}
       </button>
 
       {/* Recent log */}
-      {recentLog.length > 0 && (
+      {log.length > 0 && (
         <div className="mt-8">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-            Recent Log
-          </h3>
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent Log</h3>
           <div className="space-y-2">
-            {recentLog.map((entry, i) => (
-              <div
-                key={`${entry.date}-${entry.type}-${i}`}
-                className="flex items-center justify-between px-4 py-2.5 bg-gray-800/40 rounded-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-300">
-                    {new Date(entry.date + "T12:00:00").toLocaleDateString(
-                      "en-GB",
-                      { day: "numeric", month: "short", year: "numeric" }
-                    )}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      entry.type === "warmup"
-                        ? "bg-orange-900/40 text-orange-400"
-                        : entry.type === "rehab"
-                        ? "bg-purple-900/40 text-purple-400"
-                        : "bg-teal-900/40 text-teal-400"
-                    }`}
-                  >
-                    {entry.type === "warmup" ? "Warm-Up" : entry.type === "rehab" ? "Rehab" : "Proprio"}
-                  </span>
-                </div>
-                <span
-                  className={`text-sm font-medium ${
-                    entry.completed === entry.total
-                      ? "text-green-400"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {entry.completed}/{entry.total}
+            {log.slice(0, 20).map((entry) => (
+              <div key={entry.date} className="flex items-center justify-between px-4 py-2.5 bg-gray-800/40 rounded-xl">
+                <span className="text-sm text-gray-300">{fmtDate(entry.date)}</span>
+                <span className={`text-sm font-medium ${entry.done === entry.total ? "text-green-400" : "text-gray-400"}`}>
+                  {entry.done}/{entry.total}
                 </span>
               </div>
             ))}
