@@ -5,6 +5,7 @@ import { useSessionTimer } from "../hooks/useSessionTimer";
 import { overallProgress, sectionProgress } from "../lib/prehabSession";
 import SessionTimer from "./SessionTimer";
 import PrehabSection from "./PrehabSection";
+import Toast from "./Toast";
 
 const TIMER_KEY = "gym-prehab-v2-timer";
 
@@ -12,14 +13,14 @@ const fmtDate = (iso: string) =>
   new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default function PrehabTab() {
-  const { day, log, setSetsDone, setWeight, completeSession } = usePrehabSession();
+  const { day, log, setSetsDone, setWeight, completeSession, isSaving, isSaved, saveError } = usePrehabSession();
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     shoulders: true,
     lowerback: false,
     proprioception: false,
   });
-  const [justSaved, setJustSaved] = useState(false);
+  const [errorDismissed, setErrorDismissed] = useState(false);
 
   const overall = overallProgress(day);
   const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0;
@@ -39,9 +40,8 @@ export default function PrehabTab() {
   };
 
   const handleComplete = () => {
+    setErrorDismissed(false);
     completeSession();
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 2000);
   };
 
   return (
@@ -80,16 +80,16 @@ export default function PrehabTab() {
       {/* Complete */}
       <button
         onClick={handleComplete}
-        disabled={overall.done === 0}
+        disabled={overall.done === 0 || isSaving}
         className={`w-full mt-4 py-4 rounded-2xl font-bold text-lg touch-target transition-all duration-200 active:scale-[0.98] ${
-          justSaved
+          isSaved && !isSaving
             ? "bg-green-600 text-white"
-            : overall.done === 0
+            : overall.done === 0 || isSaving
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-700/25 hover:brightness-110"
         }`}
       >
-        {justSaved ? "Saved!" : `Complete Session (${overall.done}/${overall.total})`}
+        {isSaving ? "Saving…" : isSaved ? "Saved!" : `Complete Session (${overall.done}/${overall.total})`}
       </button>
 
       {/* Recent log */}
@@ -107,6 +107,14 @@ export default function PrehabTab() {
             ))}
           </div>
         </div>
+      )}
+
+      {saveError && !errorDismissed && (
+        <Toast
+          message="Couldn't save — check your connection and try again."
+          type="error"
+          onDismiss={() => setErrorDismissed(true)}
+        />
       )}
     </div>
   );
