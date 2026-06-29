@@ -107,7 +107,7 @@ const PREHAB_SECTIONS: PrehabSectionDef[];   // ordered
 
 ### 5.3 Timer (`useSessionTimer.ts` + `SessionTimer.tsx`)
 Replicates the main tab's behaviour as a self-contained, reusable unit:
-- **Stopwatch** counts up; tap to pause/resume; **long-press (500ms) resets**. Used to time holds.
+- **Stopwatch** counts up; tap to pause/resume; **long-press (500ms) dismisses an active rest timer** (mirrors the main workout tab's behavior). Used to time holds.
 - **Rest countdown**: `startRest(seconds)` (default **60s** for prehab); on reach 0 → set `done`, fire 3 beeps + vibrate, then repeat 2 beeps + vibrate every 3s until dismissed.
 - **Full-screen GO overlay** when rest completes; tap to dismiss.
 - Persistent `AudioContext` (init on first user gesture) for reliable iOS sound — mirrors the main tab's approach.
