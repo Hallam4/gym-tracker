@@ -8,10 +8,21 @@ interface Persisted {
   restEnd: number | null;
 }
 
+function readPersisted(storageKey: string): Persisted | null {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) return JSON.parse(raw) as Persisted;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export function useSessionTimer(storageKey: string) {
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [restEnd, setRestEnd] = useState<number | null>(null);
+  const [seconds, setSeconds] = useState<number>(() => readPersisted(storageKey)?.seconds ?? 0);
+  const [running, setRunning] = useState<boolean>(() => readPersisted(storageKey)?.running ?? false);
+  const [restEnd, setRestEnd] = useState<number | null>(() => {
+    const p = readPersisted(storageKey);
+    return p?.restEnd && p.restEnd > Date.now() ? p.restEnd : null;
+  });
   const [restCountdown, setRestCountdown] = useState<number | null>(null);
   const [restDone, setRestDone] = useState(false);
 
@@ -20,28 +31,9 @@ export function useSessionTimer(storageKey: string) {
   const longPressRef = useRef<ReturnType<typeof setTimeout>>();
   const longPressFired = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
-  const restored = useRef(false);
-
-  // Restore persisted timer once
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const p: Persisted = JSON.parse(raw);
-        setSeconds(p.seconds ?? 0);
-        setRunning(p.running ?? false);
-        if (p.restEnd && p.restEnd > Date.now()) {
-          setRestEnd(p.restEnd);
-          setRestDone(false);
-        }
-      }
-    } catch { /* ignore */ }
-    restored.current = true;
-  }, [storageKey]);
 
   // Persist
   useEffect(() => {
-    if (!restored.current) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify({ seconds, running, restEnd }));
     } catch { /* ignore */ }
@@ -117,6 +109,7 @@ export function useSessionTimer(storageKey: string) {
   useEffect(() => () => {
     if (soundRef.current) clearInterval(soundRef.current);
     if (tickRef.current) clearInterval(tickRef.current);
+    if (longPressRef.current) clearTimeout(longPressRef.current);
   }, []);
 
   const startRest = useCallback((secs: number = DEFAULT_REST_S) => {

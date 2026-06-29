@@ -26,7 +26,7 @@ export default function SessionTimer({ timer }: { timer: ReturnType<typeof useSe
           aria-label={restActive
             ? (restDone ? "Rest complete. Long-press to dismiss." : `Rest: ${restCountdown} seconds. Tap to ${running ? "pause" : "resume"} stopwatch.`)
             : (running ? "Pause stopwatch" : "Start stopwatch")}
-          className={`bg-gray-800/70 rounded-xl px-6 py-2 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${restDone ? "bg-green-600/20 rest-done-flash" : ""}`}
+          className={`rounded-xl px-6 py-2 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${restDone ? "bg-green-600/20 rest-done-flash" : "bg-gray-800/70"}`}
           role="timer"
         >
           {restActive ? (
