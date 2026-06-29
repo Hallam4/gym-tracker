@@ -177,6 +177,29 @@ export interface MuscleHistoryResponse {
   weeks: MuscleWeekEntry[];
 }
 
+export interface PrehabSectionProgress {
+  done: number;
+  total: number;
+}
+
+export interface PrehabSession {
+  date: string;
+  done: number;
+  total: number;
+  sections: Record<string, PrehabSectionProgress>;
+}
+
+export interface PrehabHistoryResponse {
+  sessions: PrehabSession[];
+}
+
+export interface PrehabCompleteRequest {
+  date: string;
+  done: number;
+  total: number;
+  sections: Record<string, PrehabSectionProgress>;
+}
+
 export const api = {
   // New Structure-based endpoints
   getStructure: (type: string) =>
@@ -197,6 +220,10 @@ export const api = {
     fetchJSON<ProgressResponse>(`/api/progress/${encodeURIComponent(exercise)}`),
   getPRs: () => fetchJSON<PRsResponse>("/api/prs"),
   getStreaks: () => fetchJSON<StreakResponse>("/api/streaks"),
+  getPrehabHistory: (limit = 30) =>
+    fetchJSON<PrehabHistoryResponse>(`/api/prehab/history?limit=${limit}`),
+  completePrehab: (data: PrehabCompleteRequest) =>
+    postJSON<{ status: string }>("/api/prehab/complete", data),
   getWeekVolume: (date?: string) =>
     fetchJSON<WeekVolumeResponse>(`/api/volume/week${date ? `?date=${date}` : ""}`),
   getMuscleHistory: (muscle: string, weeks?: number) =>
