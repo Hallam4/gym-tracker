@@ -53,8 +53,9 @@ export function overallProgress(state: DayState): SectionProgress {
 }
 
 export function buildLogEntry(state: DayState): LogEntry {
-  const sections = {} as Record<SectionId, SectionProgress>;
-  for (const s of PREHAB_SECTIONS) sections[s.id] = sectionProgress(s.id, state);
+  const sections = Object.fromEntries(
+    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state)])
+  ) as Record<SectionId, SectionProgress>;
   const overall = overallProgress(state);
   return { date: state.date, done: overall.done, total: overall.total, sections };
 }
