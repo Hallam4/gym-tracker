@@ -6,6 +6,7 @@ import sheets_client
 import parser
 import history
 import volume
+import prehab
 from models import (
     Exercise,
     WorkoutSession,
@@ -18,6 +19,8 @@ from models import (
     HistorySessionsResponse,
     WeekVolumeResponse,
     MuscleHistoryResponse,
+    PrehabCompleteRequest,
+    PrehabHistoryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -226,6 +229,26 @@ async def get_history_session(date: str, day: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+@app.post("/api/prehab/complete", response_model=dict, dependencies=[Depends(_require_api_key)])
+async def complete_prehab(req: PrehabCompleteRequest):
+    """Save a completed prehab session (overwrites today's row if present)."""
+    try:
+        prehab.save_prehab_session(req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return {"status": "ok"}
+
+
+@app.get("/api/prehab/history", response_model=PrehabHistoryResponse)
+async def get_prehab_history(limit: int = 30):
+    """Completed prehab sessions, newest-first."""
+    try:
+        sessions = prehab.get_prehab_sessions(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    return PrehabHistoryResponse(sessions=sessions)
 
 
 @app.get("/api/streaks", response_model=StreakResponse)

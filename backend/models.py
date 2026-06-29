@@ -157,3 +157,26 @@ class MuscleWeekEntry(BaseModel):
 class MuscleHistoryResponse(BaseModel):
     muscle: str
     weeks: list[MuscleWeekEntry]
+
+
+class PrehabSectionProgress(BaseModel):
+    done: int
+    total: int
+
+
+class PrehabCompleteRequest(BaseModel):
+    date: str
+    done: int
+    total: int
+    sections: dict[str, PrehabSectionProgress]
+
+
+class PrehabSession(BaseModel):
+    date: str
+    done: int
+    total: int
+    sections: dict[str, PrehabSectionProgress]
+
+
+class PrehabHistoryResponse(BaseModel):
+    sessions: list[PrehabSession]
