@@ -40,3 +40,42 @@ def test_find_row_index_hit_and_miss():
     ]
     assert prehab.find_row_index(rows, "2026-06-29") == 2
     assert prehab.find_row_index(rows, "2026-01-01") is None
+
+
+def test_get_prehab_sessions_orders_desc_and_limits(monkeypatch):
+    rows = [
+        prehab.PREHAB_HEADER,
+        ["2026-06-27", "1/1", "0/0", "0/0", "1/8"],
+        ["2026-06-29", "4/4", "3/3", "1/1", "8/8"],
+        ["2026-06-28", "2/4", "0/0", "0/0", "2/8"],
+    ]
+    monkeypatch.setattr(prehab.sheets_client, "fetch_tab", lambda tab: rows)
+    out = prehab.get_prehab_sessions(limit=2)
+    assert [s.date for s in out] == ["2026-06-29", "2026-06-28"]
+
+
+def test_get_prehab_sessions_empty_on_error(monkeypatch):
+    def boom(tab):
+        raise RuntimeError("no tab")
+    monkeypatch.setattr(prehab.sheets_client, "fetch_tab", boom)
+    assert prehab.get_prehab_sessions() == []
+
+
+def test_save_prehab_session_appends_when_absent(monkeypatch):
+    appended = []
+    monkeypatch.setattr(prehab.sheets_client, "fetch_tab", lambda tab: [prehab.PREHAB_HEADER])
+    monkeypatch.setattr(prehab.sheets_client, "append_rows", lambda tab, r: appended.extend(r))
+    monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: (_ for _ in ()).throw(AssertionError("must not write_cells")))
+    prehab.save_prehab_session(_req(date="2026-06-29"))
+    assert appended == [["2026-06-29", "4/4", "3/3", "1/1", "8/8"]]
+
+
+def test_save_prehab_session_overwrites_existing_date(monkeypatch):
+    rows = [prehab.PREHAB_HEADER, ["2026-06-29", "1/4", "0/0", "0/0", "1/8"]]
+    writes = []
+    monkeypatch.setattr(prehab.sheets_client, "fetch_tab", lambda tab: rows)
+    monkeypatch.setattr(prehab.sheets_client, "append_rows", lambda tab, r: (_ for _ in ()).throw(AssertionError("must not append")))
+    monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: writes.extend(u))
+    prehab.save_prehab_session(_req(date="2026-06-29"))
+    assert {w["row"] for w in writes} == {1}
+    assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8"]
