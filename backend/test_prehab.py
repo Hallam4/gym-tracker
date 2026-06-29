@@ -79,3 +79,45 @@ def test_save_prehab_session_overwrites_existing_date(monkeypatch):
     prehab.save_prehab_session(_req(date="2026-06-29"))
     assert {w["row"] for w in writes} == {1}
     assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8"]
+
+
+def test_get_prehab_history_endpoint(monkeypatch):
+    from fastapi.testclient import TestClient
+    import main
+    from models import PrehabSession, PrehabSectionProgress
+    sess = PrehabSession(
+        date="2026-06-29", done=8, total=8,
+        sections={
+            "shoulders": PrehabSectionProgress(done=4, total=4),
+            "lowerback": PrehabSectionProgress(done=3, total=3),
+            "proprioception": PrehabSectionProgress(done=1, total=1),
+        },
+    )
+    monkeypatch.setattr(main.prehab, "get_prehab_sessions", lambda limit=30: [sess])
+    res = TestClient(main.app).get("/api/prehab/history")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["sessions"][0]["date"] == "2026-06-29"
+    assert body["sessions"][0]["sections"]["shoulders"]["done"] == 4
+
+
+def test_complete_prehab_endpoint(monkeypatch):
+    from fastapi.testclient import TestClient
+    import main
+    captured = {}
+    monkeypatch.setattr(main.prehab, "save_prehab_session", lambda req: captured.update(req=req))
+    main.app.dependency_overrides[main._require_api_key] = lambda: None
+    try:
+        res = TestClient(main.app).post("/api/prehab/complete", json={
+            "date": "2026-06-29", "done": 8, "total": 8,
+            "sections": {
+                "shoulders": {"done": 4, "total": 4},
+                "lowerback": {"done": 3, "total": 3},
+                "proprioception": {"done": 1, "total": 1},
+            },
+        })
+        assert res.status_code == 200
+        assert res.json() == {"status": "ok"}
+        assert captured["req"].date == "2026-06-29"
+    finally:
+        main.app.dependency_overrides.clear()
