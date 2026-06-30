@@ -6,9 +6,26 @@ describe("prehabData", () => {
     expect(PREHAB_SECTIONS.map((s) => s.id)).toEqual(["shoulders", "lowerback", "proprioception"]);
   });
 
-  it("has 8 exercises total", () => {
+  it("has 6 exercises total", () => {
     const count = PREHAB_SECTIONS.reduce((n, s) => n + s.exercises.length, 0);
-    expect(count).toBe(8);
+    expect(count).toBe(6);
+  });
+
+  it("lower back is a single 5-level back-extension progression", () => {
+    const lb = PREHAB_SECTIONS.find((s) => s.id === "lowerback")!;
+    expect(lb.exercises).toHaveLength(1);
+    const prog = lb.exercises[0];
+    expect(prog.id).toBe("back-ext-progression");
+    expect(prog.levels).toBeDefined();
+    expect(prog.levels!.map((l) => l.level)).toEqual([1, 2, 3, 4, 5]);
+    for (const l of prog.levels!) {
+      expect(["loaded", "hold", "reps"]).toContain(l.kind);
+      expect(l.sets).toBeGreaterThanOrEqual(1);
+      expect(l.action).toBeTruthy();
+      expect(l.purpose).toBeTruthy();
+      expect(l.goal).toBeTruthy();
+      if (l.kind === "loaded") expect(l.weightStep ?? 0).toBeGreaterThan(0);
+    }
   });
 
   it("has unique exercise ids", () => {
