@@ -1,5 +1,7 @@
 import { PrehabExercise } from "../data/prehabData";
 import { ExerciseEntry } from "../lib/prehabSession";
+import SetButtonGrid from "./SetButtonGrid";
+import WeightAdjuster from "./WeightAdjuster";
 
 interface Props {
   exercise: PrehabExercise;
@@ -12,17 +14,6 @@ export default function PrehabExerciseCard({ exercise, entry, onSetsDone, onWeig
   const setsDone = entry?.setsDone ?? 0;
   const weight = entry?.weight ?? "";
   const allDone = setsDone >= exercise.sets;
-  const step = exercise.weightStep ?? 2.5;
-
-  // Tapping set i: if it's already filled, undo down to i; else fill up to i+1.
-  const tapSet = (i: number) => {
-    onSetsDone(i < setsDone ? i : i + 1);
-  };
-
-  const adjustWeight = (delta: number) => {
-    const current = parseFloat(weight) || 0;
-    onWeightChange(String(Math.max(0, current + delta)));
-  };
 
   return (
     <div className={`bg-gray-900 rounded-2xl py-4 px-4 ring-1 mb-2.5 ${allDone ? "ring-green-800/50" : "ring-gray-800/60"}`}>
@@ -50,43 +41,11 @@ export default function PrehabExerciseCard({ exercise, entry, onSetsDone, onWeig
 
       {/* Weight adjuster (loaded only) */}
       {exercise.kind === "loaded" && (
-        <div className="flex items-center justify-center gap-4 mt-4">
-          <button
-            onClick={() => adjustWeight(-step)}
-            aria-label={`Decrease weight by ${step}kg`}
-            className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150"
-          >
-            −
-          </button>
-          <div className="text-center min-w-[72px]">
-            <div className="text-2xl font-bold text-white tabular-nums">{weight === "" ? 0 : weight} <span className="text-sm font-normal text-gray-300">kg</span></div>
-          </div>
-          <button
-            onClick={() => adjustWeight(step)}
-            aria-label={`Increase weight by ${step}kg`}
-            className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150"
-          >
-            +
-          </button>
-        </div>
+        <WeightAdjuster weight={weight} step={exercise.weightStep ?? 2.5} onWeightChange={onWeightChange} />
       )}
 
       {/* Set buttons */}
-      <div className={`grid gap-2.5 mt-3`} style={{ gridTemplateColumns: `repeat(${Math.min(exercise.sets, 5)}, minmax(0, 1fr))` }} role="group" aria-label={`Sets for ${exercise.name}`}>
-        {Array.from({ length: exercise.sets }, (_, i) => {
-          const done = i < setsDone;
-          return (
-            <button
-              key={i}
-              onClick={() => tapSet(i)}
-              aria-label={done ? `Set ${i + 1} done. Tap to undo.` : `Log set ${i + 1}.`}
-              className={`h-11 rounded-lg font-bold text-base touch-target transition-all duration-150 active:scale-95 ${done ? "bg-green-700 text-white" : "bg-gray-800 text-gray-400"}`}
-            >
-              {done ? <span aria-hidden="true">&#10003;</span> : `S${i + 1}`}
-            </button>
-          );
-        })}
-      </div>
+      <SetButtonGrid sets={exercise.sets} setsDone={setsDone} label={exercise.name} onSetsDone={onSetsDone} />
     </div>
   );
 }
