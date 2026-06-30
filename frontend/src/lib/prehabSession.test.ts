@@ -34,9 +34,9 @@ describe("prehabSession", () => {
     expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 4 });
   });
 
-  it("overallProgress sums across all sections (8 total)", () => {
+  it("overallProgress sums across all sections (6 total)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 8 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 6 });
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -44,7 +44,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(8);
+    expect(entry.total).toBe(6);
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
