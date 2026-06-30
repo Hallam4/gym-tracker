@@ -29,9 +29,8 @@ export function usePrehabSession() {
   });
 
   const mutation = useMutation({
-    // buildLogEntry(day) is structurally a PrehabCompleteRequest; the cast bridges
-    // LogEntry's SectionId-keyed record to the API's string-keyed record.
-    mutationFn: () => api.completePrehab(buildLogEntry(day) as PrehabCompleteRequest),
+    mutationFn: (levels: Record<string, number>) =>
+      api.completePrehab(buildLogEntry(day, levels) as PrehabCompleteRequest),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prehab-history"] }),
   });
 
@@ -46,7 +45,7 @@ export function usePrehabSession() {
     }));
   }, []);
 
-  const completeSession = useCallback(() => { mutation.mutate(); }, [mutation]);
+  const completeSession = useCallback((levels: Record<string, number>) => { mutation.mutate(levels); }, [mutation]);
 
   return {
     day,
