@@ -4,7 +4,7 @@
 
 **Goal:** Replace the Lower Back section's three flat exercises with a single level-aware Back Extension progression (the 5-level Low Back Ability ladder), with the current level stored in localStorage and switchable on the card.
 
-**Architecture:** Extend `prehabData.ts` with a `PrehabLevel` type and an optional `levels` field. A pure `activeExercise()` resolver collapses a progression + current level into the flat shape existing done-tracking expects, so `sectionProgress`/`overallProgress`/`buildLogEntry` gain an optional `levels` map. A thin `usePrehabLevels` hook persists the current level to localStorage. A new `PrehabProgressionCard` renders the level stepper, per-level Action/Purpose/Goal, a progress ladder, and set/weight controls bound to the active level. `PrehabSection` picks the progression card when `ex.levels` is present.
+**Architecture:** Extend `prehabData.ts` with a `PrehabLevel` type and an optional `levels` field. A pure `activeExercise()` resolver collapses a progression + current level into the flat shape existing done-tracking expects, so `sectionProgress`/`overallProgress`/`buildLogEntry` gain an optional `levels` map. A thin `usePrehabLevels` hook persists the current level to localStorage. The set-button grid and weight ± adjuster are extracted into shared `SetButtonGrid`/`WeightAdjuster` presentational components used by both the existing `PrehabExerciseCard` and the new `PrehabProgressionCard` (which adds the level stepper, per-level Action/Purpose/Goal, and a progress ladder). `PrehabSection` picks the progression card when `ex.levels` is present.
 
 **Tech Stack:** React 18 + TypeScript, Vite, Tailwind, vitest. `@tanstack/react-query` (existing, untouched here).
 
@@ -16,7 +16,8 @@
 - **Section ids unchanged:** `shoulders`, `lowerback`, `proprioception` (backend `SECTION_ORDER` depends on these).
 - **localStorage key for levels:** `gym-prehab-levels` — distinct from the daily `gym-prehab-v2-today`.
 - **Default level = 1**, clamped to `1..levels.length`.
-- **Match the existing visual idiom** from `PrehabExerciseCard.tsx` (dark `rounded-2xl` cards, `ring-1`, gray/green/amber pills, `touch-target`, `h-11` set buttons).
+- **Match the existing visual idiom** from `PrehabExerciseCard.tsx` (dark `rounded-2xl` cards, `ring-1`, gray/green/amber pills, `touch-target`, `h-11` set buttons). The set-button grid and weight adjuster are shared via `SetButtonGrid`/`WeightAdjuster` (Task 4) — both cards use them, so there is **no** duplicated set/weight markup.
+- **A pre-commit hook auto-bumps `frontend/version.json`** — it appears in every commit's diff. Expected; not a per-task concern.
 - **Every commit message ends with this trailer** (kept out of the per-step `-m` text below for brevity — append it to each commit):
   ```
   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
@@ -173,7 +174,7 @@ git commit -m "feat(prehab): add PrehabLevel model + replace Lower Back with 5-l
 - Produces:
   - `clampLevel(level: number, count: number): number` — bounds to `[1, count]` (returns 1 if `count <= 0`).
   - `activeExercise(ex: PrehabExercise, level: number): PrehabExercise` — for a progression exercise, returns a copy with `name/kind/sets/prescription/tags/weightStep` taken from `levels[clampLevel(level,len)-1]`; for a simple exercise returns `ex` unchanged (same reference).
-  - `sectionProgress(sectionId, state, levels?: Record<string, number>)`, `overallProgress(state, levels?)`, `buildLogEntry(state, levels?)` — gain an optional 3rd/2nd `levels` arg (default `{}`), resolving each exercise via `activeExercise` before counting. Backward compatible with existing 2-arg / 1-arg calls.
+  - `sectionProgress(sectionId, state, levels?: Record<string, number>)`, `overallProgress(state, levels?)`, `buildLogEntry(state, levels?)` — gain an optional trailing `levels` arg (default `{}`), resolving each exercise via `activeExercise` before counting. Backward compatible with existing 2-arg / 1-arg calls.
 
 - [ ] **Step 1: Update existing "8 total" expectations and add the new tests**
 
@@ -308,7 +309,7 @@ git commit -m "feat(prehab): level-aware done-tracking (clampLevel + activeExerc
 - Consumes: nothing (thin localStorage wrapper; clamping happens in the card + `activeExercise`).
 - Produces: `usePrehabLevels(): { levels: Record<string, number>; setLevel: (exId: string, level: number) => void }`. Persists `levels` to localStorage key `gym-prehab-levels`.
 
-> No unit test — there is no hook-test infra (see Global Constraints), and this mirrors the untested `usePrehabSession.ts`. The gate is `npm run build` (tsc) in Step 2, plus integration/manual in Tasks 5–6.
+> No unit test — there is no hook-test infra (see Global Constraints), and this mirrors the untested `usePrehabSession.ts`. The gate is `npm run build` (tsc) in Step 2, plus integration/manual in Tasks 6–7.
 
 - [ ] **Step 1: Create the hook**
 
@@ -356,17 +357,150 @@ git commit -m "feat(prehab): usePrehabLevels hook (localStorage current-level)"
 
 ---
 
-### Task 4: `PrehabProgressionCard` component
+### Task 4: Extract shared `SetButtonGrid` + `WeightAdjuster`
+
+Pull the set-button grid and the weight ± adjuster out of `PrehabExerciseCard` into two reusable presentational components, then refactor `PrehabExerciseCard` to use them. This is a behaviour-preserving refactor that lets the new progression card (Task 5) reuse the exact same controls with no duplication.
+
+**Files:**
+- Create: `frontend/src/components/SetButtonGrid.tsx`
+- Create: `frontend/src/components/WeightAdjuster.tsx`
+- Modify: `frontend/src/components/PrehabExerciseCard.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces:
+  - `SetButtonGrid` — `default export`, props `{ sets: number; setsDone: number; label: string; onSetsDone: (setsDone: number) => void }`. Owns the tap-to-fill / tap-to-undo logic (`onSetsDone(i < setsDone ? i : i + 1)`); root has `mt-3`.
+  - `WeightAdjuster` — `default export`, props `{ weight: string; step: number; onWeightChange: (weight: string) => void }`. Owns the ±-step logic; root has `mt-4`.
+
+> No unit test (presentational, no component-test infra). Gate: `npm run build` (tsc) + `npm test` still green + manual in Task 7. Behaviour must be identical to the current card.
+
+- [ ] **Step 1: Create `SetButtonGrid`**
+
+Create `frontend/src/components/SetButtonGrid.tsx`:
+
+```tsx
+interface Props {
+  sets: number;
+  setsDone: number;
+  label: string;      // used in the group aria-label
+  onSetsDone: (setsDone: number) => void;
+}
+
+export default function SetButtonGrid({ sets, setsDone, label, onSetsDone }: Props) {
+  // Tapping set i: if it's already filled, undo down to i; else fill up to i+1.
+  const tapSet = (i: number) => onSetsDone(i < setsDone ? i : i + 1);
+
+  return (
+    <div className="grid gap-2.5 mt-3" style={{ gridTemplateColumns: `repeat(${Math.min(sets, 5)}, minmax(0, 1fr))` }} role="group" aria-label={`Sets for ${label}`}>
+      {Array.from({ length: sets }, (_, i) => {
+        const done = i < setsDone;
+        return (
+          <button
+            key={i}
+            onClick={() => tapSet(i)}
+            aria-label={done ? `Set ${i + 1} done. Tap to undo.` : `Log set ${i + 1}.`}
+            className={`h-11 rounded-lg font-bold text-base touch-target transition-all duration-150 active:scale-95 ${done ? "bg-green-700 text-white" : "bg-gray-800 text-gray-400"}`}
+          >
+            {done ? <span aria-hidden="true">&#10003;</span> : `S${i + 1}`}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Create `WeightAdjuster`**
+
+Create `frontend/src/components/WeightAdjuster.tsx`:
+
+```tsx
+interface Props {
+  weight: string;
+  step: number;
+  onWeightChange: (weight: string) => void;
+}
+
+export default function WeightAdjuster({ weight, step, onWeightChange }: Props) {
+  const adjustWeight = (delta: number) => {
+    const current = parseFloat(weight) || 0;
+    onWeightChange(String(Math.max(0, current + delta)));
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-4 mt-4">
+      <button
+        onClick={() => adjustWeight(-step)}
+        aria-label={`Decrease weight by ${step}kg`}
+        className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150"
+      >
+        −
+      </button>
+      <div className="text-center min-w-[72px]">
+        <div className="text-2xl font-bold text-white tabular-nums">{weight === "" ? 0 : weight} <span className="text-sm font-normal text-gray-300">kg</span></div>
+      </div>
+      <button
+        onClick={() => adjustWeight(step)}
+        aria-label={`Increase weight by ${step}kg`}
+        className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 3: Refactor `PrehabExerciseCard` to use them**
+
+In `frontend/src/components/PrehabExerciseCard.tsx`:
+
+(a) Add imports at the top:
+```ts
+import SetButtonGrid from "./SetButtonGrid";
+import WeightAdjuster from "./WeightAdjuster";
+```
+
+(b) Delete the now-unused local handlers and the `step` const: remove `const step = exercise.weightStep ?? 2.5;`, the `tapSet` function, and the `adjustWeight` function. Keep `setsDone`, `weight`, and `allDone`.
+
+(c) Replace the **Weight adjuster** block (the `{exercise.kind === "loaded" && ( ... )}` JSX) with:
+```tsx
+      {exercise.kind === "loaded" && (
+        <WeightAdjuster weight={weight} step={exercise.weightStep ?? 2.5} onWeightChange={onWeightChange} />
+      )}
+```
+
+(d) Replace the **Set buttons** block (the `<div className="grid gap-2.5 mt-3" ...>` … `</div>`) with:
+```tsx
+      <SetButtonGrid sets={exercise.sets} setsDone={setsDone} label={exercise.name} onSetsDone={onSetsDone} />
+```
+
+- [ ] **Step 4: Type-check and confirm the suite still passes**
+
+Run: `npm run build && npm test`
+Expected: PASS — no `tsc` errors; existing tests unchanged and green (this is a presentational refactor).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/components/SetButtonGrid.tsx src/components/WeightAdjuster.tsx src/components/PrehabExerciseCard.tsx
+git commit -m "refactor(prehab): extract shared SetButtonGrid + WeightAdjuster from PrehabExerciseCard"
+```
+(append the Co-Authored-By trailer)
+
+---
+
+### Task 5: `PrehabProgressionCard` component
 
 **Files:**
 - Create: `frontend/src/components/PrehabProgressionCard.tsx`
 
 **Interfaces:**
-- Consumes: `PrehabExercise` (Task 1), `ExerciseEntry` + `clampLevel` (Task 2).
+- Consumes: `PrehabExercise` (Task 1), `ExerciseEntry` + `clampLevel` (Task 2), `SetButtonGrid` + `WeightAdjuster` (Task 4).
 - Produces: `default export function PrehabProgressionCard(props)` where
   `props = { exercise: PrehabExercise; level: number; entry?: ExerciseEntry; onLevelChange: (level: number) => void; onSetsDone: (setsDone: number) => void; onWeightChange: (weight: string) => void }`.
 
-> No unit test (no component-test infra). Gate is `npm run build` (tsc) + manual in Task 6.
+> No unit test (no component-test infra). Gate is `npm run build` (tsc) + manual in Task 7.
 
 - [ ] **Step 1: Create the component**
 
@@ -375,6 +509,8 @@ Create `frontend/src/components/PrehabProgressionCard.tsx`:
 ```tsx
 import { PrehabExercise } from "../data/prehabData";
 import { ExerciseEntry, clampLevel } from "../lib/prehabSession";
+import SetButtonGrid from "./SetButtonGrid";
+import WeightAdjuster from "./WeightAdjuster";
 
 interface Props {
   exercise: PrehabExercise;   // must have .levels
@@ -394,13 +530,6 @@ export default function PrehabProgressionCard({ exercise, level, entry, onLevelC
   const setsDone = entry?.setsDone ?? 0;
   const weight = entry?.weight ?? "";
   const allDone = setsDone >= lvl.sets;
-  const step = lvl.weightStep ?? 2.5;
-
-  const tapSet = (i: number) => onSetsDone(i < setsDone ? i : i + 1);
-  const adjustWeight = (delta: number) => {
-    const current = parseFloat(weight) || 0;
-    onWeightChange(String(Math.max(0, current + delta)));
-  };
 
   return (
     <div className={`bg-gray-900 rounded-2xl py-4 px-4 ring-1 mb-2.5 ${allDone ? "ring-green-800/50" : "ring-gray-800/60"}`}>
@@ -463,33 +592,11 @@ export default function PrehabProgressionCard({ exercise, level, entry, onLevelC
         <p className="text-emerald-300"><span className="text-gray-500">Goal: </span>{lvl.goal}</p>
       </div>
 
-      {/* Weight adjuster (loaded level only) */}
+      {/* Weight adjuster (loaded level only) + set buttons — shared components */}
       {lvl.kind === "loaded" && (
-        <div className="flex items-center justify-center gap-4 mt-4">
-          <button onClick={() => adjustWeight(-step)} aria-label={`Decrease weight by ${step}kg`} className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150">−</button>
-          <div className="text-center min-w-[72px]">
-            <div className="text-2xl font-bold text-white tabular-nums">{weight === "" ? 0 : weight} <span className="text-sm font-normal text-gray-300">kg</span></div>
-          </div>
-          <button onClick={() => adjustWeight(step)} aria-label={`Increase weight by ${step}kg`} className="w-11 h-11 rounded-full bg-gray-800 text-white text-lg font-bold touch-target flex items-center justify-center ring-1 ring-gray-700/50 active:scale-90 transition-all duration-150">+</button>
-        </div>
+        <WeightAdjuster weight={weight} step={lvl.weightStep ?? 2.5} onWeightChange={onWeightChange} />
       )}
-
-      {/* Set buttons */}
-      <div className="grid gap-2.5 mt-3" style={{ gridTemplateColumns: `repeat(${Math.min(lvl.sets, 5)}, minmax(0, 1fr))` }} role="group" aria-label={`Sets for ${lvl.name}`}>
-        {Array.from({ length: lvl.sets }, (_, i) => {
-          const done = i < setsDone;
-          return (
-            <button
-              key={i}
-              onClick={() => tapSet(i)}
-              aria-label={done ? `Set ${i + 1} done. Tap to undo.` : `Log set ${i + 1}.`}
-              className={`h-11 rounded-lg font-bold text-base touch-target transition-all duration-150 active:scale-95 ${done ? "bg-green-700 text-white" : "bg-gray-800 text-gray-400"}`}
-            >
-              {done ? <span aria-hidden="true">&#10003;</span> : `S${i + 1}`}
-            </button>
-          );
-        })}
-      </div>
+      <SetButtonGrid sets={lvl.sets} setsDone={setsDone} label={lvl.name} onSetsDone={onSetsDone} />
     </div>
   );
 }
@@ -510,7 +617,7 @@ git commit -m "feat(prehab): PrehabProgressionCard (level stepper + action/purpo
 
 ---
 
-### Task 5: Wire it together — `PrehabSection`, `PrehabTab`, `usePrehabSession`
+### Task 6: Wire it together — `PrehabSection`, `PrehabTab`, `usePrehabSession`
 
 **Files:**
 - Modify: `frontend/src/components/PrehabSection.tsx`
@@ -518,7 +625,7 @@ git commit -m "feat(prehab): PrehabProgressionCard (level stepper + action/purpo
 - Modify: `frontend/src/hooks/usePrehabSession.ts`
 
 **Interfaces:**
-- Consumes: `usePrehabLevels` (Task 3), `PrehabProgressionCard` (Task 4), `activeExercise`/level-aware progress (Task 2).
+- Consumes: `usePrehabLevels` (Task 3), `PrehabProgressionCard` (Task 5), `activeExercise`/level-aware progress (Task 2).
 - Produces: a working Lower Back progression card in the running app; `Lower Back` logs as `1/1` when the active level's sets are complete.
 
 - [ ] **Step 1: `PrehabSection` — render the progression card when `ex.levels` is present**
@@ -652,7 +759,7 @@ git commit -m "feat(prehab): wire level-aware card into PrehabSection/PrehabTab/
 
 ---
 
-### Task 6: Manual verification (running app)
+### Task 7: Manual verification (running app)
 
 **Files:** none (verification only).
 
@@ -671,6 +778,7 @@ Open the printed local URL and go to the **Daily Prehab** tab; expand **Lower Ba
 - [ ] Ticking the active level's set(s) flips the card + the Lower Back section header to done; the overall progress bar counts Lower Back as **1** item (overall `…/6`).
 - [ ] Logging a set on **L3/L4/L5** starts the rest timer; logging on **L1/L2** (holds) does **not**.
 - [ ] Reload the page mid-session: the **current level persists** (localStorage `gym-prehab-levels`); the day's set ticks persist as before.
+- [ ] The Shoulders + Proprioception cards still render and behave exactly as before (regression check on the `SetButtonGrid`/`WeightAdjuster` extraction).
 - [ ] Tap **Complete Session**, then check the Recent Log / backend `Prehab` tab shows today with `Lower Back: 1/1` when the active level was completed.
 
 - [ ] **Step 3 (after merge): deploy-verify**
@@ -688,12 +796,13 @@ Once merged to `master` and Render redeploys (~3 min), confirm the live frontend
 - §5.1 data model → Task 1.
 - §5.2 `usePrehabLevels` localStorage (`gym-prehab-levels`) → Task 3.
 - §5.3 `activeExercise` resolver + level-aware `sectionProgress`/`overallProgress`/`buildLogEntry` → Task 2.
-- §5.4 progression card (stepper, ladder, Action/Purpose/Goal, set/weight controls) + set-state-persists-across-level-switch (uses per-`exId` `entry`) → Task 4 + Task 5 wiring.
-- §5.5 `PrehabSection` branch on `ex.levels` → Task 5.
-- §8 testing (data shape, resolver/progress, hook gated by build) → Tasks 1, 2, 3; manual → Task 6.
+- §5.4 progression card (stepper, ladder, Action/Purpose/Goal, set/weight controls) + set-state-persists-across-level-switch (uses per-`exId` `entry`) → Task 5 + Task 6 wiring. Set/weight controls are the shared `SetButtonGrid`/`WeightAdjuster` (Task 4).
+- §5.5 `PrehabSection` branch on `ex.levels` → Task 6.
+- §8 testing (data shape, resolver/progress) → Tasks 1, 2; UI/hook gated by build → Tasks 3, 4, 5; manual → Task 7.
 - §9 migration (new key; dropped exIDs harmless) → no code needed; covered by Task 1 replacing the array.
-- Rest-start must use the **active** level's kind (not the L1-mirror top-level) → Task 5 Step 3(d). ✓
+- Rest-start must use the **active** level's kind (not the L1-mirror top-level) → Task 6 Step 3(d). ✓
+- DRY decision (pre-flight): set/weight controls extracted to shared components, used by both cards → Task 4; Task 5 consumes them. ✓
 
 **Placeholder scan:** No TBD/TODO; every code step contains complete code; commands have expected output. ✓
 
-**Type consistency:** `activeExercise(ex, level)` and `clampLevel(level, count)` signatures match between Task 2 (definition) and Tasks 4/5 (use). `levels: Record<string, number>` is consistent across `usePrehabLevels` (Task 3), the progress funcs (Task 2), `PrehabSection`/`PrehabTab`/`usePrehabSession` (Task 5). `completeSession(levels)` matches between Task 5 Step 2 (definition) and Step 3(f) (call). The progression entry id `back-ext-progression` is consistent across Tasks 1, 2 tests. ✓
+**Type consistency:** `activeExercise(ex, level)` and `clampLevel(level, count)` signatures match between Task 2 (definition) and Tasks 5/6 (use). `SetButtonGrid` props `{ sets, setsDone, label, onSetsDone }` and `WeightAdjuster` props `{ weight, step, onWeightChange }` match between Task 4 (definition) and their use in `PrehabExerciseCard` (Task 4) and `PrehabProgressionCard` (Task 5). `levels: Record<string, number>` is consistent across `usePrehabLevels` (Task 3), the progress funcs (Task 2), and `PrehabSection`/`PrehabTab`/`usePrehabSession` (Task 6). `completeSession(levels)` matches between Task 6 Step 2 (definition) and Step 3(f) (call). The progression entry id `back-ext-progression` is consistent across Tasks 1, 2 tests. ✓
