@@ -35,28 +35,41 @@ export function isExerciseDone(ex: PrehabExercise, entry?: ExerciseEntry): boole
   return entry.setsDone >= ex.sets;
 }
 
-export function sectionProgress(sectionId: SectionId, state: DayState): SectionProgress {
+export function clampLevel(level: number, count: number): number {
+  if (count <= 0) return 1;
+  return Math.min(Math.max(Math.round(level), 1), count);
+}
+
+export function activeExercise(ex: PrehabExercise, level: number): PrehabExercise {
+  if (!ex.levels || ex.levels.length === 0) return ex;
+  const lvl = ex.levels[clampLevel(level, ex.levels.length) - 1];
+  return { ...ex, name: lvl.name, kind: lvl.kind, sets: lvl.sets, prescription: lvl.prescription, tags: lvl.tags, weightStep: lvl.weightStep };
+}
+
+export function sectionProgress(sectionId: SectionId, state: DayState, levels: Record<string, number> = {}): SectionProgress {
   const section = PREHAB_SECTIONS.find((s) => s.id === sectionId);
   if (!section) return { done: 0, total: 0 };
-  const done = section.exercises.filter((ex) => isExerciseDone(ex, state.entries[ex.id])).length;
+  const done = section.exercises.filter((ex) =>
+    isExerciseDone(activeExercise(ex, levels[ex.id] ?? 1), state.entries[ex.id])
+  ).length;
   return { done, total: section.exercises.length };
 }
 
-export function overallProgress(state: DayState): SectionProgress {
+export function overallProgress(state: DayState, levels: Record<string, number> = {}): SectionProgress {
   return PREHAB_SECTIONS.reduce<SectionProgress>(
     (acc, s) => {
-      const p = sectionProgress(s.id, state);
+      const p = sectionProgress(s.id, state, levels);
       return { done: acc.done + p.done, total: acc.total + p.total };
     },
     { done: 0, total: 0 }
   );
 }
 
-export function buildLogEntry(state: DayState): LogEntry {
+export function buildLogEntry(state: DayState, levels: Record<string, number> = {}): LogEntry {
   const sections = Object.fromEntries(
-    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state)])
+    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state, levels)])
   ) as Record<SectionId, SectionProgress>;
-  const overall = overallProgress(state);
+  const overall = overallProgress(state, levels);
   return { date: state.date, done: overall.done, total: overall.total, sections };
 }
 
