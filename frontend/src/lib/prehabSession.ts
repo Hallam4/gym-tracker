@@ -37,6 +37,7 @@ export function isExerciseDone(ex: PrehabExercise, entry?: ExerciseEntry): boole
 
 export function clampLevel(level: number, count: number): number {
   if (count <= 0) return 1;
+  if (!Number.isFinite(level)) return 1; // guard corrupted persisted values (e.g. NaN)
   return Math.min(Math.max(Math.round(level), 1), count);
 }
 

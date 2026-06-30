@@ -56,6 +56,8 @@ describe("prehabSession", () => {
     expect(clampLevel(3, 5)).toBe(3);
     expect(clampLevel(9, 5)).toBe(5);
     expect(clampLevel(2, 0)).toBe(1);
+    expect(clampLevel(NaN, 5)).toBe(1);       // corrupted persisted value
+    expect(clampLevel(Infinity, 5)).toBe(1);
   });
 
   it("activeExercise resolves the active level's tracking fields", () => {
@@ -65,6 +67,7 @@ describe("prehabSession", () => {
     expect(activeExercise(backExt, 3).sets).toBe(3);
     expect(activeExercise(backExt, 5).kind).toBe("loaded");
     expect(activeExercise(backExt, 99).sets).toBe(backExt.levels![4].sets); // clamps to L5
+    expect(activeExercise(backExt, 1)).not.toBe(backExt); // progression returns a distinct copy
   });
 
   it("activeExercise returns simple exercises unchanged", () => {
