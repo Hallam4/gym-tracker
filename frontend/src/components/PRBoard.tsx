@@ -84,11 +84,18 @@ export default function PRBoard() {
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-3">
                   <div className="text-gray-400 mb-1">Est. 1RM</div>
-                  <div className={`text-lg font-bold ${recent1rm ? "text-yellow-400" : "text-white"}`}>
-                    {recent1rm && <span className="text-xs mr-1">&#9733;</span>}{pr.estimated_1rm.toFixed(1)} <span className="text-sm text-gray-400">kg</span>
-                    <span className="sr-only">, achieved on {fmtDate(pr.estimated_1rm_date)}</span>
-                  </div>
-                  <div className="text-xs text-gray-400" aria-hidden="true">{fmtDate(pr.estimated_1rm_date)}</div>
+                  {pr.estimated_1rm > 0 ? (
+                    <>
+                      <div className={`text-lg font-bold ${recent1rm ? "text-yellow-400" : "text-white"}`}>
+                        {recent1rm && <span className="text-xs mr-1">&#9733;</span>}{pr.estimated_1rm.toFixed(1)} <span className="text-sm text-gray-400">kg</span>
+                        <span className="sr-only">, achieved on {fmtDate(pr.estimated_1rm_date)}</span>
+                      </div>
+                      <div className="text-xs text-gray-400" aria-hidden="true">{fmtDate(pr.estimated_1rm_date)}</div>
+                    </>
+                  ) : (
+                    // volume/amrap work — e1RM isn't meaningful, so none is tracked
+                    <div className="text-lg font-bold text-gray-600" aria-label="Not tracked for this exercise">—</div>
+                  )}
                 </div>
               </div>
             </li>

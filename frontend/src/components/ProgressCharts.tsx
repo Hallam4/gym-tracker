@@ -86,6 +86,10 @@ export default function ProgressCharts() {
     return rawChartData.filter((d) => d.date >= cutoffStr);
   }, [rawChartData, period]);
 
+  // volume/amrap exercises report estimated_1rm=0 (meaningless for that work) —
+  // hide the e1RM chart instead of drawing a flat zero line.
+  const hasE1rm = chartData.some((d) => d.estimated_1rm > 0);
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-bold text-white">Progress</h2>
@@ -309,7 +313,8 @@ export default function ProgressCharts() {
             </ResponsiveContainer>
           </div>
 
-          {/* Estimated 1RM over time */}
+          {/* Estimated 1RM over time (hidden for volume/amrap exercises) */}
+          {hasE1rm && (
           <div className="bg-gray-900 rounded-2xl p-4 ring-1 ring-gray-800/60">
             <h3 className="text-sm font-medium text-gray-400 mb-2">
               Est. 1RM Over Time
@@ -348,6 +353,7 @@ export default function ProgressCharts() {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          )}
         </section>
       )}
 

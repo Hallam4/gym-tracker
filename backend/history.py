@@ -45,6 +45,28 @@ REST_BY_MODE = {
     "amrap": 60,
 }
 
+# --- e1RM (Epley) -----------------------------------------------------------
+# Epley extrapolates badly at high reps (a 20-rep calf set once minted a
+# 226.7kg "PR" on the live board), so reps are capped before estimating.
+# Volume/amrap exercises don't get an e1RM at all — see tracks_e1rm.
+E1RM_REP_CAP = 12
+
+
+def epley_e1rm(weight: float, reps: int) -> float:
+    """Epley estimated 1RM (w × (1 + reps/30)) with reps capped at E1RM_REP_CAP."""
+    if weight <= 0 or reps <= 0:
+        return 0.0
+    return weight * (1 + min(reps, E1RM_REP_CAP) / 30)
+
+
+def tracks_e1rm(mode: str | None) -> bool:
+    """Whether an exercise's mode makes an estimated 1RM meaningful.
+
+    volume/amrap work is never trained for load, so an e1RM is noise. Unknown
+    or missing mode (exercise absent from Structure) keeps the (capped) e1RM.
+    """
+    return mode not in ("volume", "amrap")
+
 
 def _safe_get(row: list[str], idx: int) -> str:
     if idx < len(row):
@@ -198,6 +220,61 @@ def resolve_mode(mode_cell: str, rep_min: int, rep_max: int, is_amrap: bool) -> 
     return DEFAULT_MODE
 
 
+def parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
+    """Parse reps into (rep_min, rep_max). Target is a session hint, not the range."""
+    for val in (reps, target):
+        if not val or val.upper() == "AMRAP":
+            continue
+        try:
+            if "-" in val:
+                lo, hi = val.split("-", 1)
+                return int(lo), int(hi)
+            n = int(val)
+            return max(2, n - 2), n
+        except ValueError:
+            continue
+    return 8, 12  # sensible default for AMRAP / non-numeric / missing data
+
+
+# Cross-day precedence for the Structure mode map: if an exercise appears in
+# several sessions (e.g. OHP heavy in Upper 1, light pump in Arms), keep the
+# mode that makes an e1RM most meaningful.
+_MODE_RANK = {"strength": 0, "evolve": 1, "volume": 2, "amrap": 3}
+
+
+def _structure_exercise_mode(ex: Exercise) -> str:
+    """Resolve a Structure exercise's mode (mirrors main's session enrichment)."""
+    rep_min, rep_max = parse_rep_range(ex.target, ex.reps)
+    is_amrap = bool(ex.reps and ex.reps.upper() == "AMRAP") or bool(ex.target and ex.target.upper() == "AMRAP")
+    return resolve_mode(ex.mode, rep_min, rep_max, is_amrap)
+
+
+def _resolve_modes(by_type: dict[str, list[Exercise]]) -> dict[str, str]:
+    """Map lowercased exercise name -> resolved mode across all workout types."""
+    modes: dict[str, str] = {}
+    for exercises in by_type.values():
+        for ex in exercises:
+            mode = _structure_exercise_mode(ex)
+            key = ex.name.lower()
+            if key not in modes or _MODE_RANK[mode] < _MODE_RANK[modes[key]]:
+                modes[key] = mode
+    return modes
+
+
+def get_structure_modes() -> dict[str, str]:
+    """Fetch the Structure tab and resolve each exercise's progression mode.
+
+    Degrades to {} on any failure so read endpoints never break on Structure
+    access — unknown exercises just keep their capped e1RM.
+    """
+    try:
+        import parser  # peer module (kept local to avoid import-order surprises)
+        rows = sheets_client.fetch_tab(sheets_client.STRUCTURE_TAB)
+        return _resolve_modes(parser.parse_structure_tab(rows))
+    except Exception:
+        return {}
+
+
 def _sets_at_ceiling(reps: list[int], set_min: int, set_max: int, threshold: int) -> bool:
     """True if at least `set_min` of the first `set_max` sets reach `threshold`.
 
@@ -217,10 +294,22 @@ def _sets_at_ceiling(reps: list[int], set_min: int, set_max: int, threshold: int
     return hits >= needed
 
 
-def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
-    """Get progress data for a specific exercise."""
-    history = get_all_history()
+def get_exercise_progress(
+    exercise_name: str,
+    history_rows: list[HistoryRow] | None = None,
+    modes: dict[str, str] | None = None,
+) -> list[ExerciseProgress]:
+    """Get progress data for a specific exercise.
+
+    `history_rows`/`modes` inject the log and the Structure mode map for
+    testing; they default to the History tab and the live Structure modes.
+    volume/amrap exercises report estimated_1rm=0 (meaningless for that work).
+    """
+    history = history_rows if history_rows is not None else get_all_history()
+    if modes is None:
+        modes = get_structure_modes()
     exercise_name_lower = exercise_name.lower()
+    has_e1rm = tracks_e1rm(modes.get(exercise_name_lower))
 
     progress = []
     for row in history:
@@ -237,7 +326,7 @@ def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
         best_reps = max(set_reps) if set_reps else 0
         volume = weight * total_reps
 
-        estimated_1rm = round(weight * (1 + best_reps / 30), 1) if weight > 0 and best_reps > 0 else 0.0
+        estimated_1rm = round(epley_e1rm(weight, best_reps), 1) if has_e1rm else 0.0
 
         progress.append(
             ExerciseProgress(
@@ -252,9 +341,19 @@ def get_exercise_progress(exercise_name: str) -> list[ExerciseProgress]:
     return progress
 
 
-def get_prs() -> list[PREntry]:
-    """Get personal records for all exercises."""
-    history = get_all_history()
+def get_prs(
+    history_rows: list[HistoryRow] | None = None,
+    modes: dict[str, str] | None = None,
+) -> list[PREntry]:
+    """Get personal records for all exercises.
+
+    `history_rows`/`modes` inject the log and the Structure mode map for
+    testing; they default to the History tab and the live Structure modes.
+    volume/amrap exercises keep their weight PR but report estimated_1rm=0.
+    """
+    history = history_rows if history_rows is not None else get_all_history()
+    if modes is None:
+        modes = get_structure_modes()
 
     # Group by exercise
     by_exercise: dict[str, list[HistoryRow]] = {}
@@ -270,6 +369,7 @@ def get_prs() -> list[PREntry]:
         best_weight_date = ""
         best_1rm = 0.0
         best_1rm_date = ""
+        has_e1rm = tracks_e1rm(modes.get(exercise.lower()))
 
         for row in rows:
             w = _parse_weight(row.weight)
@@ -283,10 +383,10 @@ def get_prs() -> list[PREntry]:
                 best_weight = w
                 best_weight_date = row.date
 
-            # Epley 1RM per set: weight × (1 + reps / 30)
-            for reps in set_reps:
-                if reps > 0 and w > 0:
-                    e1rm = w * (1 + reps / 30)
+            # Epley 1RM per set (reps capped; skipped for volume/amrap modes)
+            if has_e1rm:
+                for reps in set_reps:
+                    e1rm = epley_e1rm(w, reps)
                     if e1rm > best_1rm:
                         best_1rm = e1rm
                         best_1rm_date = row.date
@@ -314,6 +414,7 @@ def compute_workout_summary(
     today_date: str,
     day_label: str | None = None,
     history_rows: list[HistoryRow] | None = None,
+    modes: dict[str, str] | None = None,
 ) -> list[ExerciseSummary]:
     """Compute per-exercise summary comparing current session to prior history.
 
@@ -321,10 +422,14 @@ def compute_workout_summary(
 
     When `day_label` is set, the prior comparison is scoped to that session, so a
     light Arms OHP isn't measured against the heavy Upper 1 OHP (which would show
-    a false weight drop and suppress Arms PRs). `history_rows` injects the prior
-    log for testing; it defaults to the full History tab.
+    a false weight drop and suppress Arms PRs). `history_rows`/`modes` inject the
+    prior log and the Structure mode map for testing; they default to the full
+    History tab and the live Structure modes. e1RM comparisons use the capped
+    Epley estimate, and volume/amrap exercises never fire a 1RM PR.
     """
     history = history_rows if history_rows is not None else get_all_history()
+    if modes is None:
+        modes = get_structure_modes()
     if day_label:
         wanted = _CODE_TO_LABEL.get(day_label, day_label)
         history = [r for r in history if r.day == wanted]
@@ -342,11 +447,11 @@ def compute_workout_summary(
         if row.date > prior[name]["recent_date"]:
             prior[name]["recent_date"] = row.date
             prior[name]["recent_weight"] = w
-        # Best 1RM
-        set_reps = [_parse_reps(s) for s in [row.set1, row.set2, row.set3, row.set4, row.set5] if s]
-        for reps in set_reps:
-            if reps > 0 and w > 0:
-                e1rm = w * (1 + reps / 30)
+        # Best 1RM (reps capped; volume/amrap exercises don't track e1RM)
+        if tracks_e1rm(modes.get(name.lower())):
+            set_reps = [_parse_reps(s) for s in [row.set1, row.set2, row.set3, row.set4, row.set5] if s]
+            for reps in set_reps:
+                e1rm = epley_e1rm(w, reps)
                 if e1rm > prior[name]["best_1rm"]:
                     prior[name]["best_1rm"] = e1rm
 
@@ -356,7 +461,10 @@ def compute_workout_summary(
             continue
         w = _parse_weight(ex.weight)
         set_reps = [_parse_reps(s) for s in ex.set_results if s]
-        current_1rm = max((w * (1 + r / 30) for r in set_reps if r > 0 and w > 0), default=0.0)
+        if tracks_e1rm(modes.get(ex.name.lower())):
+            current_1rm = max((epley_e1rm(w, r) for r in set_reps), default=0.0)
+        else:
+            current_1rm = 0.0
 
         p = prior.get(ex.name)
         prev_weight = p["recent_weight"] if p and p["recent_weight"] > 0 else None

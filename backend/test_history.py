@@ -371,3 +371,164 @@ def test_workout_summary_without_day_label_pools_all_sessions():
     s = summaries[0]
     assert s.prev_weight == 60.0    # most recent OHP overall is the 60kg Upper 1
     assert s.is_weight_pr is False  # 30 < 60
+
+
+# ==========================================================================
+# e1RM integrity: rep cap + mode-aware suppression
+# ==========================================================================
+# Epley (w × (1 + reps/30)) diverges badly at high reps — a 20-rep calf set
+# produced an absurd 226.7kg "PR" on the live board. Reps are capped at
+# E1RM_REP_CAP, and volume/amrap exercises don't get an e1RM at all.
+
+def make_struct_ex(name: str, reps: str, target: str = "", mode: str = "") -> Exercise:
+    """Build a Structure-tab Exercise (the shape parse_structure_tab produces)."""
+    return Exercise(
+        name=name, reps=reps, sets="3", weight="20kg", target=target,
+        set_results=[], rest_times=[], notes="", mode=mode,
+        sheet_row=0, superset_group=0,
+    )
+
+
+# --- epley_e1rm helper ------------------------------------------------------
+
+def test_epley_e1rm_caps_reps_at_12():
+    """85kg × 20 reps must score the same as 85kg × 12 — not extrapolate."""
+    assert history.epley_e1rm(85, 20) == pytest.approx(85 * (1 + 12 / 30))  # 119.0
+    assert history.epley_e1rm(85, 12) == pytest.approx(85 * (1 + 12 / 30))
+
+
+def test_epley_e1rm_below_cap_unchanged():
+    assert history.epley_e1rm(100, 5) == pytest.approx(100 * (1 + 5 / 30))
+    assert history.epley_e1rm(80, 1) == pytest.approx(80 * (1 + 1 / 30))
+
+
+def test_epley_e1rm_zero_inputs_return_zero():
+    assert history.epley_e1rm(0, 10) == 0.0
+    assert history.epley_e1rm(80, 0) == 0.0
+    assert history.epley_e1rm(-5, 10) == 0.0
+
+
+def test_tracks_e1rm_by_mode():
+    """e1RM is meaningful for strength/evolve; meaningless for volume/amrap.
+    Unknown/missing mode (exercise not in Structure) keeps the e1RM (capped)."""
+    assert history.tracks_e1rm("strength") is True
+    assert history.tracks_e1rm("evolve") is True
+    assert history.tracks_e1rm("volume") is False
+    assert history.tracks_e1rm("amrap") is False
+    assert history.tracks_e1rm(None) is True
+
+
+# --- get_prs ----------------------------------------------------------------
+
+def test_get_prs_caps_high_rep_e1rm():
+    """Regression (live calf-raise bug): a 20-rep set must not mint a monster PR."""
+    rows = [make_row("2026-01-03", 85, [20, 18, 15], 4, exercise="Calf Raise")]
+    prs = history.get_prs(history_rows=rows, modes={})
+    assert prs[0].estimated_1rm == pytest.approx(119.0)  # 85 × 1.4, NOT 226.7
+
+
+def test_get_prs_volume_mode_has_no_e1rm():
+    rows = [make_row("2026-01-03", 85, [20, 18, 15], 4, exercise="Calf Raise")]
+    prs = history.get_prs(history_rows=rows, modes={"calf raise": "volume"})
+    assert prs[0].estimated_1rm == 0.0
+    assert prs[0].estimated_1rm_date == ""
+    assert prs[0].best_weight == 85.0  # weight PR still tracked
+
+
+def test_get_prs_amrap_mode_has_no_e1rm():
+    rows = [make_row("2026-01-03", 20, [25, 22], 3, exercise="Weighted Push-up")]
+    prs = history.get_prs(history_rows=rows, modes={"weighted push-up": "amrap"})
+    assert prs[0].estimated_1rm == 0.0
+
+
+def test_get_prs_strength_mode_keeps_capped_e1rm():
+    rows = [make_row("2026-01-03", 100, [5, 5, 5], 3, exercise="Bench")]
+    prs = history.get_prs(history_rows=rows, modes={"bench": "strength"})
+    assert prs[0].estimated_1rm == pytest.approx(round(100 * (1 + 5 / 30), 1))
+
+
+# --- get_exercise_progress ---------------------------------------------------
+
+def test_get_exercise_progress_caps_e1rm():
+    rows = [make_row("2026-01-03", 85, [20, 18, 15], 4, exercise="Calf Raise")]
+    pts = history.get_exercise_progress("Calf Raise", history_rows=rows, modes={})
+    assert pts[0].estimated_1rm == pytest.approx(119.0)
+
+
+def test_get_exercise_progress_volume_mode_zeroes_e1rm():
+    rows = [make_row("2026-01-03", 85, [20, 18, 15], 4, exercise="Calf Raise")]
+    pts = history.get_exercise_progress(
+        "Calf Raise", history_rows=rows, modes={"calf raise": "volume"}
+    )
+    assert pts[0].estimated_1rm == 0.0
+    assert pts[0].volume > 0  # tonnage still tracked
+
+
+# --- compute_workout_summary --------------------------------------------------
+
+def test_workout_summary_caps_e1rm_for_pr_comparison():
+    """A high-rep lighter session must not out-'1RM' a genuinely heavier one.
+    Prior: 100kg × 12 (capped e1RM 140). Current: 90kg × 20 — uncapped Epley
+    would score 150 and celebrate a false PR; capped it scores 126 → no PR."""
+    prior = [make_row("2026-01-01", 100, [12, 12, 12], 3, exercise="Bench")]
+    current = [make_ex("Bench", 90, ["20", "18", "15"])]
+    s = history.compute_workout_summary(current, "2026-01-03", history_rows=prior, modes={})
+    assert s[0].is_1rm_pr is False
+
+
+def test_workout_summary_no_1rm_pr_for_volume_mode():
+    """Volume work never fires the 1RM-PR celebration."""
+    prior = [make_row("2026-01-01", 15, [12, 12, 12, 12], 4, exercise="Lateral Raise")]
+    current = [make_ex("Lateral Raise", 15, ["15", "15", "15", "15"], reps="12-15", sets="4", target="15")]
+    s = history.compute_workout_summary(
+        current, "2026-01-03", history_rows=prior, modes={"lateral raise": "volume"}
+    )
+    assert s[0].is_1rm_pr is False
+    assert s[0].is_weight_pr is False  # same weight — and weight logic untouched
+
+
+def test_workout_summary_capped_e1rm_pr_still_fires_for_real_progress():
+    """Sanity: capping must not kill legitimate 1RM PRs (heavier weight, low reps)."""
+    prior = [make_row("2026-01-01", 100, [5, 5, 5], 3, exercise="Bench")]
+    current = [make_ex("Bench", 105, ["5", "5", "5"], reps="4-6", sets="3", target="5")]
+    s = history.compute_workout_summary(current, "2026-01-03", history_rows=prior, modes={})
+    assert s[0].is_1rm_pr is True
+
+
+# --- parse_rep_range (moved from main so history can resolve Structure modes) --
+
+def test_parse_rep_range_basics():
+    assert history.parse_rep_range(None, "8-12") == (8, 12)
+    assert history.parse_rep_range("10", "8-12") == (8, 12)  # reps wins over target
+    assert history.parse_rep_range(None, "5") == (3, 5)      # single value → (n-2, n)
+    assert history.parse_rep_range(None, "AMRAP") == (8, 12) # AMRAP → default
+    assert history.parse_rep_range(None, None) == (8, 12)
+
+
+# --- Structure → mode map -----------------------------------------------------
+
+def test_resolve_modes_infers_from_structure():
+    by_type = {
+        "U1": [make_struct_ex("Bench", reps="4-6")],          # strength
+        "L1": [make_struct_ex("Calf Raise", reps="12-15")],   # volume
+        "U2": [make_struct_ex("Leg Raise", reps="AMRAP")],    # amrap
+    }
+    modes = history._resolve_modes(by_type)
+    assert modes["bench"] == "strength"
+    assert modes["calf raise"] == "volume"
+    assert modes["leg raise"] == "amrap"
+
+
+def test_resolve_modes_explicit_cell_wins():
+    by_type = {"U1": [make_struct_ex("Face Pulls", reps="8-12", mode="volume")]}
+    assert history._resolve_modes(by_type)["face pulls"] == "volume"
+
+
+def test_resolve_modes_cross_day_precedence_keeps_e1rm():
+    """OHP is heavy strength work in Upper 1 and a light pump in Arms — the
+    strength slot means its e1RM is meaningful, so strength must win the map."""
+    by_type = {
+        "U1": [make_struct_ex("OHP", reps="2-5")],    # strength
+        "Arm": [make_struct_ex("OHP", reps="12-15")], # volume
+    }
+    assert history._resolve_modes(by_type)["ohp"] == "strength"

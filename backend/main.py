@@ -55,27 +55,11 @@ app.add_middleware(
 )
 
 
-def _parse_rep_range(target: str | None, reps: str | None) -> tuple[int, int]:
-    """Parse reps into (rep_min, rep_max). Target is a session hint, not the range."""
-    for val in (reps, target):
-        if not val or val.upper() == "AMRAP":
-            continue
-        try:
-            if "-" in val:
-                lo, hi = val.split("-", 1)
-                return int(lo), int(hi)
-            n = int(val)
-            return max(2, n - 2), n
-        except ValueError:
-            continue
-    return 8, 12  # sensible default for AMRAP / non-numeric / missing data
-
-
 def _enrich_with_progression(session: WorkoutSession):
     """Add double-progression suggestions to each exercise in the session."""
     all_history = history.get_all_history()
     for ex in session.exercises:
-        rep_min, rep_max = _parse_rep_range(ex.target, ex.reps)
+        rep_min, rep_max = history.parse_rep_range(ex.target, ex.reps)
         ex.rep_min = rep_min
         ex.rep_max = rep_max
         ex.is_amrap = bool(ex.reps and ex.reps.upper() == "AMRAP") or bool(ex.target and ex.target.upper() == "AMRAP")
@@ -178,7 +162,7 @@ async def complete_workout_new(req: CompleteWorkoutRequest):
                 target_col = j
 
         for struct_ex in structure_exercises:
-            rep_min, rep_max = _parse_rep_range(struct_ex.target, struct_ex.reps)
+            rep_min, rep_max = history.parse_rep_range(struct_ex.target, struct_ex.reps)
             is_amrap = bool(struct_ex.reps and struct_ex.reps.upper() == "AMRAP") or bool(struct_ex.target and struct_ex.target.upper() == "AMRAP")
             mode = history.resolve_mode(struct_ex.mode, rep_min, rep_max, is_amrap)
             current_target = int(struct_ex.target) if struct_ex.target and struct_ex.target.isdigit() else rep_max
