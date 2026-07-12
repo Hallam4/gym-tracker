@@ -70,6 +70,8 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
       { id: "ant-delt-iso", name: "Anterior Delt Isometric", kind: "hold", sets: 5, prescription: "5×30–45s", tags: ["easy", "pain-free"] },
       { id: "scap-front-raise", name: "Scap-Plane Front Raise", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["light", "thumb-up", "to shoulder height"], weightStep: 1.25 },
       { id: "side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "3×15", tags: ["light", "cap 45°"], weightStep: 1.25 },
+      { id: "belly-press-ir", name: "Belly-Press IR (subscap)", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["band/light", "elbow tucked", "anterior stabiliser"], note: "arm adducted — low-provocation", weightStep: 1.25 },
+      { id: "serratus-punch", name: "Serratus Punch / Scap Push-up", kind: "reps", sets: 2, prescription: "2×12–15", tags: ["serratus", "protract at top", "scapular base"], note: "closed-chain; scapular control before load" },
       { id: "rhythmic-stab", name: "Rhythmic Stabilization", kind: "hold", sets: 3, prescription: "3×20–30s", tags: ["scap plane"] },
     ],
   },
