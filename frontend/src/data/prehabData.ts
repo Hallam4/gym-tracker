@@ -102,6 +102,7 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
       { id: "scap-front-raise", name: "Scap-Plane Front Raise", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["light", "thumb-up", "to shoulder height"], weightStep: 1.25 },
       { id: "side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "3×15", tags: ["light", "cap 45°"], weightStep: 1.25 },
       { id: "belly-press-ir", name: "Belly-Press IR (subscap)", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["band/light", "elbow tucked", "anterior stabiliser"], note: "arm adducted — low-provocation", weightStep: 1.25 },
+      { id: "scap-retraction", name: "Band Pull-Apart / Face Pull", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["rear delt + mid/lower trap", "squeeze at short range", "C-scoop"], note: "posterior scap — balances the pack ladder; low-provocation", weightStep: 1.25 },
       {
         id: "closed-chain-progression",
         name: "Closed-Chain Pack",
