@@ -19,7 +19,7 @@ services:
     runtime: node
     rootDir: frontend
     buildCommand: npm install && npm run build
-    startCommand: npx serve dist -s -l $PORT
+    startCommand: ./node_modules/.bin/serve dist -s -l $PORT
     plan: free
     envVars:
       - key: VITE_API_URL
