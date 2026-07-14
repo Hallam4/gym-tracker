@@ -1,8 +1,7 @@
 import { PrehabSectionDef } from "../data/prehabData";
-import { DayState, SectionProgress, visibleExercises, effectiveExercise } from "../lib/prehabSession";
+import { DayState, SectionProgress } from "../lib/prehabSession";
 import PrehabExerciseCard from "./PrehabExerciseCard";
 import PrehabProgressionCard from "./PrehabProgressionCard";
-import PrehabPhaseCard from "./PrehabPhaseCard";
 
 interface Props {
   section: PrehabSectionDef;
@@ -14,11 +13,9 @@ interface Props {
   onToggle: () => void;
   onSetsDone: (exId: string, setsDone: number) => void;
   onWeightChange: (exId: string, weight: string) => void;
-  phase: number;
-  onPhaseChange: (phase: number) => void;
 }
 
-export default function PrehabSection({ section, day, progress, levels, onLevelChange, open, onToggle, onSetsDone, onWeightChange, phase, onPhaseChange }: Props) {
+export default function PrehabSection({ section, day, progress, levels, onLevelChange, open, onToggle, onSetsDone, onWeightChange }: Props) {
   const complete = progress.done === progress.total;
   return (
     <div className="mb-3">
@@ -41,10 +38,7 @@ export default function PrehabSection({ section, day, progress, levels, onLevelC
 
       {open && (
         <div className="mt-2">
-          {section.phases && (
-            <PrehabPhaseCard phases={section.phases} phase={phase} onPhaseChange={onPhaseChange} />
-          )}
-          {visibleExercises(section, phase).map((ex) =>
+          {section.exercises.map((ex) =>
             ex.levels ? (
               <PrehabProgressionCard
                 key={ex.id}
@@ -58,7 +52,7 @@ export default function PrehabSection({ section, day, progress, levels, onLevelC
             ) : (
               <PrehabExerciseCard
                 key={ex.id}
-                exercise={effectiveExercise(ex, levels[ex.id] ?? 1, phase)}
+                exercise={ex}
                 entry={day.entries[ex.id]}
                 onSetsDone={(setsDone) => onSetsDone(ex.id, setsDone)}
                 onWeightChange={(w) => onWeightChange(ex.id, w)}

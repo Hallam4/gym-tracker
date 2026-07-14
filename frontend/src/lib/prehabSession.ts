@@ -1,4 +1,4 @@
-import { PREHAB_SECTIONS, PrehabExercise, PrehabSectionDef, PhaseDose, SectionId } from "../data/prehabData";
+import { PREHAB_SECTIONS, PrehabExercise, SectionId } from "../data/prehabData";
 
 export interface ExerciseEntry {
   setsDone: number;
@@ -47,61 +47,29 @@ export function activeExercise(ex: PrehabExercise, level: number): PrehabExercis
   return { ...ex, name: lvl.name, kind: lvl.kind, sets: lvl.sets, prescription: lvl.prescription, tags: lvl.tags, weightStep: lvl.weightStep };
 }
 
-export type PhaseResolution = PhaseDose | "hidden" | "default";
-
-/** Resolve an exercise's dose for a phase. Fail-closed: an unknown phase key hides it. */
-export function phaseDose(ex: PrehabExercise, phase: number): PhaseResolution {
-  if (!ex.phasePlan) return "default";
-  const dose = ex.phasePlan[phase];
-  return dose === null || dose === undefined ? "hidden" : dose;
-}
-
-export type EffectiveExercise = PrehabExercise & { maintenance?: boolean };
-
-/** Ladder level first, then phase dose override. Hidden exercises resolve to base (callers filter first). */
-export function effectiveExercise(ex: PrehabExercise, level: number, phase: number): EffectiveExercise {
-  const base = activeExercise(ex, level);
-  const dose = phaseDose(ex, phase);
-  if (dose === "default" || dose === "hidden") return base;
-  return {
-    ...base,
-    sets: dose.sets,
-    prescription: dose.prescription,
-    tags: dose.tags ?? base.tags,
-    note: dose.note ?? base.note,
-    maintenance: dose.maintenance,
-  };
-}
-
-export function visibleExercises(section: PrehabSectionDef, phase: number): PrehabExercise[] {
-  return section.exercises.filter((ex) => phaseDose(ex, phase) !== "hidden");
-}
-
-export function sectionProgress(sectionId: SectionId, state: DayState, levels: Record<string, number> = {}, phase = 1): SectionProgress {
+export function sectionProgress(sectionId: SectionId, state: DayState, levels: Record<string, number> = {}): SectionProgress {
   const section = PREHAB_SECTIONS.find((s) => s.id === sectionId);
   if (!section) return { done: 0, total: 0 };
-  const visible = visibleExercises(section, phase);
-  const done = visible.filter((ex) =>
-    isExerciseDone(effectiveExercise(ex, levels[ex.id] ?? 1, phase), state.entries[ex.id])
+  const done = section.exercises.filter((ex) =>
+    isExerciseDone(activeExercise(ex, levels[ex.id] ?? 1), state.entries[ex.id])
   ).length;
-  return { done, total: visible.length };
+  return { done, total: section.exercises.length };
 }
 
-export function overallProgress(state: DayState, levels: Record<string, number> = {}, phase = 1): SectionProgress {
+export function overallProgress(state: DayState, levels: Record<string, number> = {}): SectionProgress {
   return PREHAB_SECTIONS.reduce<SectionProgress>(
     (acc, s) => {
-      const p = sectionProgress(s.id, state, levels, phase);
+      const p = sectionProgress(s.id, state, levels);
       return { done: acc.done + p.done, total: acc.total + p.total };
     },
     { done: 0, total: 0 }
   );
 }
 
-export function buildLogEntry(state: DayState, levels: Record<string, number> = {}, phase = 1): LogEntry {
+export function buildLogEntry(state: DayState, levels: Record<string, number> = {}): LogEntry {
   const sections = Object.fromEntries(
-    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state, levels, phase)])
+    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state, levels)])
   ) as Record<SectionId, SectionProgress>;
-  const overall = overallProgress(state, levels, phase);
+  const overall = overallProgress(state, levels);
   return { date: state.date, done: overall.done, total: overall.total, sections };
 }
-
