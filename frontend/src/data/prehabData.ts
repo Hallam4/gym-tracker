@@ -14,6 +14,21 @@ export interface PrehabLevel {
   goal: string;
 }
 
+export interface PhaseDose {
+  sets: number;
+  prescription: string;
+  tags?: string[];
+  note?: string;
+  maintenance?: boolean;   // renders the "maintenance" pill
+}
+
+export interface PrehabPhaseDef {
+  phase: number;        // 1-based, display "Phase 2 of 3"
+  name: string;
+  goal: string;
+  advanceWhen: string;  // manual gate — card copy only, never auto-advances
+}
+
 export interface PrehabExercise {
   id: string;            // stable storage key
   name: string;
@@ -24,6 +39,9 @@ export interface PrehabExercise {
   note?: string;         // e.g. "progression (2–3×/week)"
   weightStep?: number;   // loaded only: ± increment (default 2.5)
   levels?: PrehabLevel[];   // when present → progression exercise (active level overrides top-level kind/sets/etc.)
+  // When present: per-phase dose override. null = hidden in that phase.
+  // Must define EVERY phase of the owning section (test-enforced). Absent = phase-independent.
+  phasePlan?: Record<number, PhaseDose | null>;
 }
 
 export interface PrehabSectionDef {
@@ -31,6 +49,7 @@ export interface PrehabSectionDef {
   label: string;
   icon: string;
   exercises: PrehabExercise[];
+  phases?: PrehabPhaseDef[];   // shoulders only
 }
 
 const BACK_EXT_LEVELS: PrehabLevel[] = [
@@ -59,6 +78,18 @@ const BACK_EXT_LEVELS: PrehabLevel[] = [
     action: "Add progressive resistance by holding a weight plate or barbell.",
     purpose: "Maximises tissue resilience and bulletproofs the spine against heavy lifting or impact.",
     goal: "Scale the weight up over time while keeping perfect form." },
+];
+
+const SHOULDER_PHASES: PrehabPhaseDef[] = [
+  { phase: 1, name: "Short-Range Squeezes",
+    goal: "Months of easy, pain-free short-range cuff work in adducted, low-provocation positions.",
+    advanceWhen: "8–12 weeks all-GREEN (no ache, no apprehension) and target doses feel easy." },
+  { phase: 2, name: "Stretch-Loaded",
+    goal: "Load the cuff through range with light dumbbells — full comfortable range, slow.",
+    advanceWhen: "4–6 weeks GREEN on full-range dumbbell work." },
+  { phase: 3, name: "Pack / Pull",
+    goal: "Row progressions (C-scoop) as the new stimulus; earlier work drops to maintenance.",
+    advanceWhen: "Ongoing — final phase. Pack ladder Level 5 stays gated on being symptom-free." },
 ];
 
 // Closed-chain scapular/serratus "pack" ladder — progresses load in the SAFE (horizontal)
@@ -97,12 +128,38 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
     id: "shoulders",
     label: "Shoulders",
     icon: "🦾",
+    phases: SHOULDER_PHASES,
     exercises: [
-      { id: "ant-delt-iso", name: "Anterior Delt Isometric", kind: "hold", sets: 5, prescription: "5×30–45s", tags: ["easy", "pain-free"] },
-      { id: "scap-front-raise", name: "Scap-Plane Front Raise", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["light", "thumb-up", "to shoulder height"], weightStep: 1.25 },
-      { id: "side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "3×15", tags: ["light", "cap 45°"], weightStep: 1.25 },
-      { id: "belly-press-ir", name: "Belly-Press IR (subscap)", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["band/light", "elbow tucked", "anterior stabiliser"], note: "arm adducted — low-provocation", weightStep: 1.25 },
-      { id: "scap-retraction", name: "Band Pull-Apart / Face Pull", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["rear delt + mid/lower trap", "squeeze at short range", "C-scoop"], note: "posterior scap — balances the pack ladder; low-provocation", weightStep: 1.25 },
+      { id: "ant-delt-iso", name: "Anterior Delt Isometric", kind: "hold", sets: 5, prescription: "5×30–45s", tags: ["easy", "pain-free"],
+        phasePlan: {
+          1: { sets: 5, prescription: "5×30–45s" },
+          2: { sets: 2, prescription: "2×30s", maintenance: true },
+          3: { sets: 1, prescription: "1×45s", maintenance: true },
+        } },
+      { id: "scap-front-raise", name: "Scap-Plane Front Raise", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["light", "thumb-up", "to shoulder height"], weightStep: 1.25,
+        phasePlan: {
+          1: null,
+          2: { sets: 2, prescription: "2×12–15" },
+          3: { sets: 1, prescription: "1×12–15", maintenance: true },
+        } },
+      { id: "side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "3×15", tags: ["light", "cap 45°"], weightStep: 1.25,
+        phasePlan: {
+          1: { sets: 3, prescription: "3×15", tags: ["light", "cap 45°"] },
+          2: { sets: 3, prescription: "3×12–15", tags: ["light", "full comfortable range", "slow"] },
+          3: { sets: 2, prescription: "2×12", maintenance: true },
+        } },
+      { id: "belly-press-ir", name: "Belly-Press IR (subscap)", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["band/light", "elbow tucked", "anterior stabiliser"], note: "arm adducted — low-provocation", weightStep: 1.25,
+        phasePlan: {
+          1: { sets: 3, prescription: "3×12–15" },
+          2: { sets: 2, prescription: "2×12", maintenance: true },
+          3: { sets: 2, prescription: "2×12", maintenance: true },
+        } },
+      { id: "scap-retraction", name: "Band Pull-Apart / Face Pull", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["rear delt + mid/lower trap", "squeeze at short range", "C-scoop"], note: "posterior scap — balances the pack ladder; low-provocation", weightStep: 1.25,
+        phasePlan: {
+          1: { sets: 2, prescription: "2×12–15" },
+          2: { sets: 1, prescription: "1×15", maintenance: true },
+          3: { sets: 3, prescription: "3×8–12", tags: ["C-scoop", "short-range squeeze", "band row → inverted row / TRX"] },
+        } },
       {
         id: "closed-chain-progression",
         name: "Closed-Chain Pack",
@@ -113,7 +170,12 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
         note: "≥4–6 wks/level · stop on apprehension",
         levels: SHOULDER_PACK_LEVELS,
       },
-      { id: "rhythmic-stab", name: "Rhythmic Stabilization", kind: "hold", sets: 3, prescription: "3×20–30s", tags: ["scap plane"] },
+      { id: "rhythmic-stab", name: "Rhythmic Stabilization", kind: "hold", sets: 3, prescription: "3×20–30s", tags: ["scap plane"],
+        phasePlan: {
+          1: { sets: 3, prescription: "3×20–30s" },
+          2: { sets: 2, prescription: "2×20s", maintenance: true },
+          3: { sets: 2, prescription: "2×20s", maintenance: true },
+        } },
     ],
   },
   {

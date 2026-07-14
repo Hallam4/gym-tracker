@@ -83,3 +83,38 @@ describe("prehabSession", () => {
   });
 
 });
+
+describe("phase data invariants", () => {
+  const shoulders = PREHAB_SECTIONS[0];
+
+  it("shoulders defines exactly 3 phases, numbered 1..3", () => {
+    expect(shoulders.phases?.map((p) => p.phase)).toEqual([1, 2, 3]);
+  });
+
+  it("only the shoulders section defines phases", () => {
+    for (const s of PREHAB_SECTIONS.slice(1)) expect(s.phases).toBeUndefined();
+  });
+
+  it("every phasePlan is exhaustive over the section's phases", () => {
+    for (const ex of shoulders.exercises) {
+      if (!ex.phasePlan) continue;
+      for (const p of shoulders.phases!) {
+        expect(Object.prototype.hasOwnProperty.call(ex.phasePlan, p.phase),
+          `${ex.id} missing phase ${p.phase}`).toBe(true);
+      }
+    }
+  });
+
+  it("no exercise mixes levels with phasePlan; pack ladder has no phasePlan", () => {
+    for (const s of PREHAB_SECTIONS) for (const ex of s.exercises) {
+      if (ex.levels) expect(ex.phasePlan, `${ex.id} mixes levels+phasePlan`).toBeUndefined();
+    }
+    const pack = shoulders.exercises.find((e) => e.id === "closed-chain-progression")!;
+    expect(pack.phasePlan).toBeUndefined();
+  });
+
+  it("no exercise outside shoulders has a phasePlan", () => {
+    for (const s of PREHAB_SECTIONS.slice(1)) for (const ex of s.exercises)
+      expect(ex.phasePlan).toBeUndefined();
+  });
+});
