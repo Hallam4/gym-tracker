@@ -33,12 +33,12 @@ describe("prehabSession", () => {
 
   it("sectionProgress counts finished exercises in a section", () => {
     const state = { date: "d", entries: { "ant-delt-iso": { setsDone: 5 } } };
-    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 4 });
+    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 7 });
   });
 
   it("overallProgress sums across all sections (6 total)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 6 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 12 });
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -46,7 +46,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(6);
+    expect(entry.total).toBe(12);
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
@@ -77,9 +77,9 @@ describe("prehabSession", () => {
   it("sectionProgress for lowerback respects the active level's set count", () => {
     const state = { date: "d", entries: { "back-ext-progression": { setsDone: 1 } } };
     // Level 1 needs 1 set → done
-    expect(sectionProgress("lowerback", state, { "back-ext-progression": 1 })).toEqual({ done: 1, total: 1 });
+    expect(sectionProgress("lowerback", state, { "back-ext-progression": 1 })).toEqual({ done: 1, total: 4 });
     // Level 3 needs 3 sets → not done with only 1 logged
-    expect(sectionProgress("lowerback", state, { "back-ext-progression": 3 })).toEqual({ done: 0, total: 1 });
+    expect(sectionProgress("lowerback", state, { "back-ext-progression": 3 })).toEqual({ done: 0, total: 4 });
   });
 
 });
