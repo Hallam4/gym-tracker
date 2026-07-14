@@ -8,12 +8,12 @@ describe("prehabData", () => {
 
   it("has 6 exercises total", () => {
     const count = PREHAB_SECTIONS.reduce((n, s) => n + s.exercises.length, 0);
-    expect(count).toBe(6);
+    expect(count).toBe(13);
   });
 
   it("lower back is a single 5-level back-extension progression", () => {
     const lb = PREHAB_SECTIONS.find((s) => s.id === "lowerback")!;
-    expect(lb.exercises).toHaveLength(1);
+    expect(lb.exercises).toHaveLength(4);
     const prog = lb.exercises[0];
     expect(prog.id).toBe("back-ext-progression");
     expect(prog.levels).toBeDefined();
