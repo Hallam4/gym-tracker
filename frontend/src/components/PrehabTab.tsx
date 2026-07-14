@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { PREHAB_SECTIONS, SectionId, PrehabExercise } from "../data/prehabData";
 import { usePrehabSession } from "../hooks/usePrehabSession";
 import { useSessionTimer } from "../hooks/useSessionTimer";
-import { overallProgress, sectionProgress, activeExercise } from "../lib/prehabSession";
+import { overallProgress, sectionProgress, activeExercise, clampLevel } from "../lib/prehabSession";
 import { usePrehabLevels } from "../hooks/usePrehabLevels";
 import { usePrehabPhase } from "../hooks/usePrehabPhase";
 import SessionTimer from "./SessionTimer";
@@ -17,7 +17,9 @@ const fmtDate = (iso: string) =>
 export default function PrehabTab() {
   const { day, log, setSetsDone, setWeight, completeSession, isSaving, isSaved, saveError } = usePrehabSession();
   const { levels, setLevel } = usePrehabLevels();
-  const { phase, setPhase } = usePrehabPhase();
+  const { phase: rawPhase, setPhase } = usePrehabPhase();
+  const phasedSection = PREHAB_SECTIONS.find((s) => s.phases);
+  const phase = clampLevel(rawPhase, phasedSection?.phases?.length ?? 1);
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     shoulders: true,
