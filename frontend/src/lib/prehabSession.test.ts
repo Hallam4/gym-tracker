@@ -84,10 +84,10 @@ describe("prehabSession", () => {
 
   it("pull ladder resolves its levels like other progressions", () => {
     const pull = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "pull-ladder")!;
-    expect(pull.levels).toHaveLength(5);
+    expect(pull.levels).toHaveLength(3);
     expect(activeExercise(pull, 1).sets).toBe(3);
-    expect(activeExercise(pull, 5).kind).toBe("reps");
-    expect(activeExercise(pull, 99).sets).toBe(pull.levels![4].sets);
+    expect(activeExercise(pull, 3).kind).toBe("reps");
+    expect(activeExercise(pull, 99).sets).toBe(pull.levels![2].sets);
   });
 
 });
