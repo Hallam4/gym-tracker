@@ -4,6 +4,7 @@ import {
   emptyDayState, rollIfNewDay, isExerciseDone,
   sectionProgress, overallProgress, buildLogEntry,
   clampLevel, activeExercise,
+  phaseDose, effectiveExercise, visibleExercises,
 } from "./prehabSession";
 
 const antDelt = PREHAB_SECTIONS[0].exercises[0]; // sets: 5
@@ -33,12 +34,12 @@ describe("prehabSession", () => {
 
   it("sectionProgress counts finished exercises in a section", () => {
     const state = { date: "d", entries: { "ant-delt-iso": { setsDone: 5 } } };
-    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 7 });
+    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 6 });
   });
 
   it("overallProgress sums across all sections (6 total)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 12 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 11 });
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -46,7 +47,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(12);
+    expect(entry.total).toBe(11);
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
@@ -116,5 +117,69 @@ describe("phase data invariants", () => {
   it("no exercise outside shoulders has a phasePlan", () => {
     for (const s of PREHAB_SECTIONS.slice(1)) for (const ex of s.exercises)
       expect(ex.phasePlan).toBeUndefined();
+  });
+});
+
+describe("phase resolution", () => {
+  const shoulders = PREHAB_SECTIONS[0];
+  const sideLyingEr = shoulders.exercises.find((e) => e.id === "side-lying-er")!;
+  const frontRaise = shoulders.exercises.find((e) => e.id === "scap-front-raise")!;
+  const stretchIr = () => shoulders.exercises.find((e) => e.id === "stretch-ir")!;
+  const pack = shoulders.exercises.find((e) => e.id === "closed-chain-progression")!;
+
+  it("stretch-ir exists, hidden in phase 1, full in phase 2, maintenance in phase 3", () => {
+    expect(stretchIr()).toBeDefined();
+    expect(phaseDose(stretchIr(), 1)).toBe("hidden");
+    expect(phaseDose(stretchIr(), 2)).toMatchObject({ sets: 2 });
+    expect(phaseDose(stretchIr(), 3)).toMatchObject({ sets: 1, maintenance: true });
+  });
+
+  it("phaseDose: default for plan-less exercises, hidden for null, dose otherwise", () => {
+    expect(phaseDose(pack, 1)).toBe("default");
+    expect(phaseDose(frontRaise, 1)).toBe("hidden");
+    expect(phaseDose(sideLyingEr, 2)).toMatchObject({ prescription: "3×12–15" });
+  });
+
+  it("effectiveExercise applies the phase dose over the base exercise", () => {
+    const p3 = effectiveExercise(sideLyingEr, 1, 3);
+    expect(p3.sets).toBe(2);
+    expect(p3.maintenance).toBe(true);
+    expect(p3.id).toBe("side-lying-er");
+    const p1 = effectiveExercise(sideLyingEr, 1, 1);
+    expect(p1.sets).toBe(3);
+    expect(p1.maintenance).toBeUndefined();
+  });
+
+  it("effectiveExercise leaves the pack ladder to its own levels at every phase", () => {
+    for (const phase of [1, 2, 3]) {
+      expect(effectiveExercise(pack, 2, phase).sets).toBe(pack.levels![1].sets);
+    }
+  });
+
+  it("visibleExercises: phase 1 hides front raise + stretch-ir; phases 2–3 show all 8", () => {
+    expect(visibleExercises(shoulders, 1).map((e) => e.id)).not.toContain("scap-front-raise");
+    expect(visibleExercises(shoulders, 1)).toHaveLength(6);
+    expect(visibleExercises(shoulders, 2)).toHaveLength(8);
+    expect(visibleExercises(shoulders, 3)).toHaveLength(8);
+  });
+
+  it("non-shoulders sections are identical at every phase", () => {
+    for (const s of PREHAB_SECTIONS.slice(1)) for (const phase of [1, 2, 3]) {
+      expect(visibleExercises(s, phase)).toEqual(s.exercises);
+    }
+  });
+
+  it("sectionProgress counts only visible exercises with phase-effective sets", () => {
+    // belly-press-ir needs 3 sets in phase 1 but only 2 in phase 2
+    const state = { date: "d", entries: { "belly-press-ir": { setsDone: 2 } } };
+    expect(sectionProgress("shoulders", state, {}, 1)).toEqual({ done: 0, total: 6 });
+    expect(sectionProgress("shoulders", state, {}, 2)).toEqual({ done: 1, total: 8 });
+  });
+
+  it("overallProgress/buildLogEntry respect the phase", () => {
+    const state = { date: "d", entries: {} };
+    expect(overallProgress(state, {}, 1).total).toBe(11);  // 6 + 4 + 1
+    expect(overallProgress(state, {}, 2).total).toBe(13);  // 8 + 4 + 1
+    expect(buildLogEntry(state, {}, 2).total).toBe(13);
   });
 });

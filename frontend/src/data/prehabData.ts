@@ -154,6 +154,12 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
           2: { sets: 2, prescription: "2×12", maintenance: true },
           3: { sets: 2, prescription: "2×12", maintenance: true },
         } },
+      { id: "stretch-ir", name: "Stretch-Loaded IR", kind: "loaded", sets: 2, prescription: "2×12", tags: ["light dumbbell", "arm supported", "lengthened emphasis"], weightStep: 1.25,
+        phasePlan: {
+          1: null,
+          2: { sets: 2, prescription: "2×12" },
+          3: { sets: 1, prescription: "1×12", maintenance: true },
+        } },
       { id: "scap-retraction", name: "Band Pull-Apart / Face Pull", kind: "loaded", sets: 2, prescription: "2×12–15", tags: ["rear delt + mid/lower trap", "squeeze at short range", "C-scoop"], note: "posterior scap — balances the pack ladder; low-provocation", weightStep: 1.25,
         phasePlan: {
           1: { sets: 2, prescription: "2×12–15" },
