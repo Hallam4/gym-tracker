@@ -4,6 +4,7 @@ import { usePrehabSession } from "../hooks/usePrehabSession";
 import { useSessionTimer } from "../hooks/useSessionTimer";
 import { overallProgress, sectionProgress, activeExercise } from "../lib/prehabSession";
 import { usePrehabLevels } from "../hooks/usePrehabLevels";
+import { usePrehabPhase } from "../hooks/usePrehabPhase";
 import SessionTimer from "./SessionTimer";
 import PrehabSection from "./PrehabSection";
 import Toast from "./Toast";
@@ -16,6 +17,7 @@ const fmtDate = (iso: string) =>
 export default function PrehabTab() {
   const { day, log, setSetsDone, setWeight, completeSession, isSaving, isSaved, saveError } = usePrehabSession();
   const { levels, setLevel } = usePrehabLevels();
+  const { phase, setPhase } = usePrehabPhase();
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     shoulders: true,
@@ -33,7 +35,7 @@ export default function PrehabTab() {
     return () => clearTimeout(t);
   }, [isSaved]);
 
-  const overall = overallProgress(day, levels);
+  const overall = overallProgress(day, levels, phase);
   const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0;
 
   // Look up an exercise to decide whether logging a set should start a rest.
@@ -52,7 +54,7 @@ export default function PrehabTab() {
 
   const handleComplete = () => {
     setErrorDismissed(false);
-    completeSession(levels);
+    completeSession(levels, phase);
   };
 
   return (
@@ -80,13 +82,15 @@ export default function PrehabTab() {
           key={section.id}
           section={section}
           day={day}
-          progress={sectionProgress(section.id, day, levels)}
+          progress={sectionProgress(section.id, day, levels, phase)}
           levels={levels}
           open={open[section.id]}
           onToggle={() => setOpen((o) => ({ ...o, [section.id]: !o[section.id] }))}
           onSetsDone={handleSetsDone}
           onWeightChange={setWeight}
           onLevelChange={setLevel}
+          phase={phase}
+          onPhaseChange={setPhase}
         />
       ))}
 

@@ -1,10 +1,9 @@
-import { PrehabExercise } from "../data/prehabData";
-import { ExerciseEntry } from "../lib/prehabSession";
+import { EffectiveExercise, ExerciseEntry } from "../lib/prehabSession";
 import SetButtonGrid from "./SetButtonGrid";
 import WeightAdjuster from "./WeightAdjuster";
 
 interface Props {
-  exercise: PrehabExercise;
+  exercise: EffectiveExercise;
   entry?: ExerciseEntry;
   onSetsDone: (setsDone: number) => void;
   onWeightChange: (weight: string) => void;
@@ -34,6 +33,9 @@ export default function PrehabExerciseCard({ exercise, entry, onSetsDone, onWeig
             ))}
             {exercise.note && (
               <span className="text-xs bg-amber-900/40 text-amber-300 px-1.5 py-0.5 rounded">{exercise.note}</span>
+            )}
+            {exercise.maintenance && (
+              <span className="text-xs bg-sky-900/40 text-sky-300 px-1.5 py-0.5 rounded">maintenance</span>
             )}
           </div>
         </div>

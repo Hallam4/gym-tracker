@@ -29,8 +29,8 @@ export function usePrehabSession() {
   });
 
   const mutation = useMutation({
-    mutationFn: (levels: Record<string, number>) =>
-      api.completePrehab(buildLogEntry(day, levels) as PrehabCompleteRequest),
+    mutationFn: ({ levels, phase }: { levels: Record<string, number>; phase: number }) =>
+      api.completePrehab(buildLogEntry(day, levels, phase) as PrehabCompleteRequest),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prehab-history"] }),
   });
 
@@ -45,7 +45,9 @@ export function usePrehabSession() {
     }));
   }, []);
 
-  const completeSession = useCallback((levels: Record<string, number>) => { mutation.mutate(levels); }, [mutation]);
+  const completeSession = useCallback((levels: Record<string, number>, phase: number) => {
+    mutation.mutate({ levels, phase });
+  }, [mutation]);
 
   return {
     day,
