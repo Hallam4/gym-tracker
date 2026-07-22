@@ -169,6 +169,7 @@ class PrehabCompleteRequest(BaseModel):
     done: int
     total: int
     sections: dict[str, PrehabSectionProgress]
+    notes: str = ""
 
 
 class PrehabSession(BaseModel):
@@ -176,6 +177,7 @@ class PrehabSession(BaseModel):
     done: int
     total: int
     sections: dict[str, PrehabSectionProgress]
+    notes: str = ""
 
 
 class PrehabHistoryResponse(BaseModel):

@@ -9,7 +9,7 @@ from models import PrehabCompleteRequest, PrehabSession, PrehabSectionProgress
 
 PREHAB_TAB = "Prehab"
 SECTION_ORDER = ["shoulders", "lowerback", "proprioception"]
-PREHAB_HEADER = ["Date", "Shoulders", "Lower Back", "Proprioception", "Total"]
+PREHAB_HEADER = ["Date", "Shoulders", "Lower Back", "Proprioception", "Total", "Notes"]
 
 
 def _safe_get(row: list[str], idx: int) -> str:
@@ -23,6 +23,7 @@ def prehab_row(req: PrehabCompleteRequest) -> list[str]:
         p = req.sections.get(sid) or PrehabSectionProgress(done=0, total=0)
         cells.append(f"{p.done}/{p.total}")
     cells.append(f"{req.done}/{req.total}")
+    cells.append(req.notes)
     return cells
 
 
@@ -41,7 +42,8 @@ def parse_prehab_row(row: list[str]) -> PrehabSession | None:
         return None
     sections = {sid: _parse_pair(_safe_get(row, i + 1)) for i, sid in enumerate(SECTION_ORDER)}
     total = _parse_pair(_safe_get(row, 1 + len(SECTION_ORDER)))
-    return PrehabSession(date=date, done=total.done, total=total.total, sections=sections)
+    notes = _safe_get(row, 2 + len(SECTION_ORDER))
+    return PrehabSession(date=date, done=total.done, total=total.total, sections=sections, notes=notes)
 
 
 def find_row_index(rows: list[list[str]], date: str) -> int | None:

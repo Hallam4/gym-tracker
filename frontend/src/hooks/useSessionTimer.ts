@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_REST_S = 60;
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 interface Persisted {
   seconds: number;
   running: boolean;
   restEnd: number | null;
+  date?: string;
 }
 
 function readPersisted(storageKey: string): Persisted | null {
@@ -17,8 +20,15 @@ function readPersisted(storageKey: string): Persisted | null {
 }
 
 export function useSessionTimer(storageKey: string) {
-  const [seconds, setSeconds] = useState<number>(() => readPersisted(storageKey)?.seconds ?? 0);
-  const [running, setRunning] = useState<boolean>(() => readPersisted(storageKey)?.running ?? false);
+  // Stopwatch resets on a new day: a stored value only carries over if it was saved today.
+  const [seconds, setSeconds] = useState<number>(() => {
+    const p = readPersisted(storageKey);
+    return p && p.date === todayStr() ? p.seconds : 0;
+  });
+  const [running, setRunning] = useState<boolean>(() => {
+    const p = readPersisted(storageKey);
+    return p && p.date === todayStr() ? p.running : false;
+  });
   const [restEnd, setRestEnd] = useState<number | null>(() => {
     const p = readPersisted(storageKey);
     return p?.restEnd && p.restEnd > Date.now() ? p.restEnd : null;
@@ -35,7 +45,7 @@ export function useSessionTimer(storageKey: string) {
   // Persist
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ seconds, running, restEnd }));
+      localStorage.setItem(storageKey, JSON.stringify({ seconds, running, restEnd, date: todayStr() }));
     } catch { /* ignore */ }
   }, [storageKey, seconds, running, restEnd]);
 
@@ -140,10 +150,12 @@ export function useSessionTimer(storageKey: string) {
     longPressFired.current = false;
     longPressRef.current = setTimeout(() => {
       longPressFired.current = true;
-      dismissRest();
+      // Long-press dismisses an active rest; otherwise it resets the session stopwatch.
+      if (restEnd !== null) dismissRest();
+      else resetStopwatch();
       try { navigator.vibrate?.(50); } catch { /* ignore */ }
     }, 500);
-  }, [dismissRest]);
+  }, [dismissRest, resetStopwatch, restEnd]);
 
   const onPressEnd = useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current);

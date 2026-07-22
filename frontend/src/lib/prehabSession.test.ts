@@ -90,4 +90,26 @@ describe("prehabSession", () => {
     expect(activeExercise(pull, 99).sets).toBe(pull.levels![2].sets);
   });
 
+  it("pack ladder resolves its levels like other progressions", () => {
+    const pack = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "closed-chain-progression")!;
+    expect(pack.levels).toHaveLength(3);
+    expect(activeExercise(pack, 1).kind).toBe("hold");
+    expect(activeExercise(pack, 3).kind).toBe("reps");
+    expect(activeExercise(pack, 99).sets).toBe(pack.levels![2].sets);
+  });
+
+  it("overallProgress and buildLogEntry exclude the non-daily assessment section", () => {
+    const state = { date: "d", entries: {} };
+    expect(PREHAB_SECTIONS.length).toBe(4);            // 4 sections exist…
+    expect(overallProgress(state)).toEqual({ done: 0, total: 9 }); // …but only 9 daily exercises count
+    const entry = buildLogEntry(state);
+    expect(entry.total).toBe(9);
+    expect(entry.sections.assessment).toBeUndefined();
+  });
+
+  it("buildLogEntry carries notes through", () => {
+    const state = { date: "2026-06-29", entries: {}, notes: "R felt tweaky" };
+    expect(buildLogEntry(state).notes).toBe("R felt tweaky");
+  });
+
 });

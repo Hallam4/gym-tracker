@@ -45,6 +45,10 @@ export function usePrehabSession() {
     }));
   }, []);
 
+  const setNotes = useCallback((notes: string) => {
+    setDay((d) => ({ ...d, notes }));
+  }, []);
+
   const completeSession = useCallback((levels: Record<string, number>) => { mutation.mutate(levels); }, [mutation]);
 
   return {
@@ -52,6 +56,7 @@ export function usePrehabSession() {
     log,
     setSetsDone,
     setWeight,
+    setNotes,
     completeSession,
     isSaving: mutation.isPending,
     isSaved: mutation.isSuccess,

@@ -187,6 +187,7 @@ export interface PrehabSession {
   done: number;
   total: number;
   sections: Record<string, PrehabSectionProgress>;
+  notes: string;
 }
 
 export interface PrehabHistoryResponse {
@@ -198,6 +199,7 @@ export interface PrehabCompleteRequest {
   done: number;
   total: number;
   sections: Record<string, PrehabSectionProgress>;
+  notes: string;
 }
 
 export const api = {

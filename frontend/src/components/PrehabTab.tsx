@@ -14,13 +14,14 @@ const fmtDate = (iso: string) =>
   new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default function PrehabTab() {
-  const { day, log, setSetsDone, setWeight, completeSession, isSaving, isSaved, saveError } = usePrehabSession();
+  const { day, log, setSetsDone, setWeight, setNotes, completeSession, isSaving, isSaved, saveError } = usePrehabSession();
   const { levels, setLevel } = usePrehabLevels();
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     shoulders: true,
     lowerback: false,
     proprioception: false,
+    assessment: false,
   });
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -29,6 +30,7 @@ export default function PrehabTab() {
   useEffect(() => {
     if (!isSaved) return;
     setJustSaved(true);
+    timer.resetStopwatch(); // clock resets when a session is completed
     const t = setTimeout(() => setJustSaved(false), 2000);
     return () => clearTimeout(t);
   }, [isSaved]);
@@ -90,6 +92,19 @@ export default function PrehabTab() {
         />
       ))}
 
+      {/* Notes (saved with today's session) */}
+      <div className="mt-4">
+        <label htmlFor="prehab-notes" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Notes</label>
+        <textarea
+          id="prehab-notes"
+          value={day.notes ?? ""}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Niggles, loads, how a level felt… (saved with today's session)"
+          rows={2}
+          className="w-full rounded-xl bg-gray-900 ring-1 ring-gray-800/60 px-3 py-2 text-sm text-gray-200 placeholder-gray-600 resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        />
+      </div>
+
       {/* Complete */}
       <button
         onClick={handleComplete}
@@ -111,11 +126,16 @@ export default function PrehabTab() {
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent Log</h3>
           <div className="space-y-2">
             {log.slice(0, 20).map((entry) => (
-              <div key={entry.date} className="flex items-center justify-between px-4 py-2.5 bg-gray-800/40 rounded-xl">
-                <span className="text-sm text-gray-300">{fmtDate(entry.date)}</span>
-                <span className={`text-sm font-medium ${entry.done === entry.total ? "text-green-400" : "text-gray-400"}`}>
-                  {entry.done}/{entry.total}
-                </span>
+              <div key={entry.date} className="px-4 py-2.5 bg-gray-800/40 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">{fmtDate(entry.date)}</span>
+                  <span className={`text-sm font-medium ${entry.done === entry.total ? "text-green-400" : "text-gray-400"}`}>
+                    {entry.done}/{entry.total}
+                  </span>
+                </div>
+                {entry.notes && (
+                  <p className="mt-1 text-xs text-gray-400 whitespace-pre-wrap">📝 {entry.notes}</p>
+                )}
               </div>
             ))}
           </div>
@@ -129,6 +149,9 @@ export default function PrehabTab() {
           onDismiss={() => setErrorDismissed(true)}
         />
       )}
+
+      {/* Spacer so the floating clock doesn't cover the last content */}
+      <div aria-hidden="true" className="h-20" />
     </div>
   );
 }

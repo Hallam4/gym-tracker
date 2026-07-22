@@ -3,9 +3,9 @@ import prehab
 from models import PrehabCompleteRequest, PrehabSectionProgress
 
 
-def _req(date="2026-06-29", sh=(4, 4), lb=(3, 3), pr=(1, 1), done=8, total=8):
+def _req(date="2026-06-29", sh=(4, 4), lb=(3, 3), pr=(1, 1), done=8, total=8, notes=""):
     return PrehabCompleteRequest(
-        date=date, done=done, total=total,
+        date=date, done=done, total=total, notes=notes,
         sections={
             "shoulders": PrehabSectionProgress(done=sh[0], total=sh[1]),
             "lowerback": PrehabSectionProgress(done=lb[0], total=lb[1]),
@@ -15,15 +15,23 @@ def _req(date="2026-06-29", sh=(4, 4), lb=(3, 3), pr=(1, 1), done=8, total=8):
 
 
 def test_prehab_row_serializes_in_order():
-    assert prehab.prehab_row(_req()) == ["2026-06-29", "4/4", "3/3", "1/1", "8/8"]
+    assert prehab.prehab_row(_req()) == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]
 
 
 def test_parse_prehab_row_roundtrip():
-    s = prehab.parse_prehab_row(prehab.prehab_row(_req(sh=(2, 4), done=6, total=8)))
+    s = prehab.parse_prehab_row(prehab.prehab_row(_req(sh=(2, 4), done=6, total=8, notes="R felt tweaky")))
     assert s is not None
     assert s.date == "2026-06-29"
     assert (s.done, s.total) == (6, 8)
     assert (s.sections["shoulders"].done, s.sections["shoulders"].total) == (2, 4)
+    assert s.notes == "R felt tweaky"
+
+
+def test_parse_legacy_row_without_notes_column():
+    # Rows written before the Notes column must still parse, with notes defaulting to "".
+    s = prehab.parse_prehab_row(["2026-06-29", "4/4", "3/3", "1/1", "8/8"])
+    assert s is not None
+    assert s.notes == ""
 
 
 def test_parse_prehab_row_header_and_blank_return_none():
@@ -67,7 +75,7 @@ def test_save_prehab_session_appends_when_absent(monkeypatch):
     monkeypatch.setattr(prehab.sheets_client, "append_rows", lambda tab, r: appended.extend(r))
     monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: (_ for _ in ()).throw(AssertionError("must not write_cells")))
     prehab.save_prehab_session(_req(date="2026-06-29"))
-    assert appended == [["2026-06-29", "4/4", "3/3", "1/1", "8/8"]]
+    assert appended == [["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]]
 
 
 def test_save_prehab_session_overwrites_existing_date(monkeypatch):
@@ -78,7 +86,7 @@ def test_save_prehab_session_overwrites_existing_date(monkeypatch):
     monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: writes.extend(u))
     prehab.save_prehab_session(_req(date="2026-06-29"))
     assert {w["row"] for w in writes} == {1}
-    assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8"]
+    assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]
 
 
 def test_get_prehab_history_endpoint(monkeypatch):

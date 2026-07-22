@@ -8,6 +8,7 @@ export interface ExerciseEntry {
 export interface DayState {
   date: string; // YYYY-MM-DD
   entries: Record<string, ExerciseEntry>;
+  notes?: string;
 }
 
 export interface SectionProgress {
@@ -20,6 +21,7 @@ export interface LogEntry {
   done: number;
   total: number;
   sections: Record<SectionId, SectionProgress>;
+  notes?: string;
 }
 
 export function emptyDayState(date: string): DayState {
@@ -57,7 +59,7 @@ export function sectionProgress(sectionId: SectionId, state: DayState, levels: R
 }
 
 export function overallProgress(state: DayState, levels: Record<string, number> = {}): SectionProgress {
-  return PREHAB_SECTIONS.reduce<SectionProgress>(
+  return PREHAB_SECTIONS.filter((s) => s.daily !== false).reduce<SectionProgress>(
     (acc, s) => {
       const p = sectionProgress(s.id, state, levels);
       return { done: acc.done + p.done, total: acc.total + p.total };
@@ -68,8 +70,8 @@ export function overallProgress(state: DayState, levels: Record<string, number> 
 
 export function buildLogEntry(state: DayState, levels: Record<string, number> = {}): LogEntry {
   const sections = Object.fromEntries(
-    PREHAB_SECTIONS.map((s) => [s.id, sectionProgress(s.id, state, levels)])
+    PREHAB_SECTIONS.filter((s) => s.daily !== false).map((s) => [s.id, sectionProgress(s.id, state, levels)])
   ) as Record<SectionId, SectionProgress>;
   const overall = overallProgress(state, levels);
-  return { date: state.date, done: overall.done, total: overall.total, sections };
+  return { date: state.date, done: overall.done, total: overall.total, sections, notes: state.notes ?? "" };
 }

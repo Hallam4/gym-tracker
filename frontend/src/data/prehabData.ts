@@ -1,4 +1,4 @@
-export type SectionId = "shoulders" | "lowerback" | "proprioception";
+export type SectionId = "shoulders" | "lowerback" | "proprioception" | "assessment";
 export type ExerciseKind = "loaded" | "hold" | "reps";
 
 export interface PrehabLevel {
@@ -30,6 +30,7 @@ export interface PrehabSectionDef {
   id: SectionId;
   label: string;
   icon: string;
+  daily?: boolean;   // default true; false = shown but excluded from daily progress totals (one-off tools)
   exercises: PrehabExercise[];
 }
 
@@ -98,6 +99,26 @@ const PULL_LEVELS: PrehabLevel[] = [
     action: "Traverse monkey bars hand over hand, varying rhythm and direction; build single-arm hang tolerance toward 5–10 seconds.",
     purpose: "The most exposing pull — dynamic, unpredictable distraction with rotation through the ball and socket.",
     goal: "A full traverse run and a 5–10s single-arm hang." },
+];
+
+// One-off shoulder rotation self-assessment (GIRD / total-arc check). Lives in a
+// non-daily "Assessment" section so it never counts toward the daily progress %.
+const SHOULDER_ROTATION_ASSESSMENT_LEVELS: PrehabLevel[] = [
+  { level: 1, name: "Measure IR (both sides)", kind: "hold", sets: 1, prescription: "L vs R",
+    tags: ["supine 90° abduction", "elbow 90°", "stop when shoulder lifts", "baseline 22 Jul L/R 35/30"],
+    action: "Lie on your back, arm out to 90°, elbow bent 90° (forearm to the ceiling = 0°), a rolled towel under the upper arm. Rotate the hand forward/down toward your feet. Stop the moment the front of the shoulder lifts off — that's the joint's true end. Read the forearm angle with a phone level app (zero it at vertical). Do the good (left) side first, then the right.",
+    purpose: "Internal rotation is the safe direction and the primary GIRD signal — a big right-vs-left IR gap points to posterior-capsule tightness.",
+    goal: "Record left and right IR. A gap under ~15° = no meaningful GIRD." },
+  { level: 2, name: "Measure ER / total arc", kind: "hold", sets: 1, prescription: "L vs R · stop at apprehension",
+    tags: ["apprehension direction", "go slow", "don't force", "baseline 22 Jul L/R 67/44"],
+    action: "From vertical, rotate the hand back/down toward the floor above your head — the apprehension direction. Go slowly and STOP at the first apprehension, pinch or pain; note that angle and that it was an apprehension stop. Skip entirely if it feels risky. Total arc = IR + ER for each side.",
+    purpose: "Separates a soft-tissue IR deficit from a bony one, and shows how much the right guards the unstable position.",
+    goal: "Record left and right ER (or the apprehension angle) and compare total arcs." },
+  { level: 3, name: "Read the result", kind: "hold", sets: 1, prescription: "decide the action",
+    tags: ["IR gap <15° = no GIRD", "reduced arc = soft-tissue", "ER loss = guarding, not a stretch target"],
+    action: "IR gap under ~15° → no GIRD, no IR stretch. IR gap ≥15° with a reduced total arc → soft-tissue tightness → trial modified sleeper / cross-body. IR gap ≥15° but total arc preserved (big ER gain) → bony/adaptive → leave it. Reduced ER + reduced total arc with symmetric IR (the 22 Jul pattern) = apprehension guarding of the unstable shoulder — a finding, NOT a stretch target; never stretch into ER here.",
+    purpose: "Turns the numbers into a yes/no on whether stretching earns a place in prehab.",
+    goal: "Decide: add an IR stretch, or leave prehab as-is and take the numbers to the specialist." },
 ];
 
 export const PREHAB_SECTIONS: PrehabSectionDef[] = [
@@ -181,6 +202,24 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
     icon: "🧍",
     exercises: [
       { id: "single-leg-stand", name: "Single-Leg Stand (current level)", kind: "hold", sets: 1, prescription: "30–60s each", tags: ["eyes open → closed → cushion → +head turns"] },
+    ],
+  },
+  {
+    id: "assessment",
+    label: "Assessment",
+    icon: "📏",
+    daily: false,   // one-off tool — shown but excluded from the daily progress count
+    exercises: [
+      {
+        id: "shoulder-rotation-assessment",
+        name: "Shoulder Rotation Check",
+        kind: SHOULDER_ROTATION_ASSESSMENT_LEVELS[0].kind,
+        sets: SHOULDER_ROTATION_ASSESSMENT_LEVELS[0].sets,
+        prescription: SHOULDER_ROTATION_ASSESSMENT_LEVELS[0].prescription,
+        tags: SHOULDER_ROTATION_ASSESSMENT_LEVELS[0].tags,
+        note: "one-off · not daily",
+        levels: SHOULDER_ROTATION_ASSESSMENT_LEVELS,
+      },
     ],
   },
 ];
