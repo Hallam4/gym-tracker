@@ -174,7 +174,7 @@ export default function App() {
         {tab === "home" && <HomeDashboard onNavigate={setTab} />}
         {/* TodayWorkout stays mounted so timer/scroll/state survive tab switches */}
         <div style={{ display: tab === "today" ? "block" : "none" }} role="tabpanel" id="tabpanel-today" aria-labelledby="tab-today">
-          <ErrorBoundary><TodayWorkout onActiveChange={setWorkoutActive} /></ErrorBoundary>
+          <ErrorBoundary><TodayWorkout onActiveChange={setWorkoutActive} active={tab === "today"} /></ErrorBoundary>
         </div>
         {tab === "history" && <WorkoutBrowser />}
         {tab === "progress" && <ProgressCharts />}

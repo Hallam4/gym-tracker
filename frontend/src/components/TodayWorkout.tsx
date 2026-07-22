@@ -8,6 +8,7 @@ import { fmtDate } from "../utils/formatDate";
 import Toast from "./Toast";
 import ConfirmModal from "./ConfirmModal";
 import WorkoutSummary from "./WorkoutSummary";
+import FloatingTimerDock from "./FloatingTimerDock";
 
 const TYPES = ["U1", "L1", "U2", "L2", "Arm"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -21,7 +22,7 @@ const TYPE_LABELS: Record<string, string> = {
 const MAX_SETS = 5;
 const REST_DURATION_S = 240; // 4 minutes
 
-export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (active: boolean) => void }) {
+export default function TodayWorkout({ onActiveChange, active = true }: { onActiveChange?: (active: boolean) => void; active?: boolean }) {
   const [selectedType, setSelectedType] = useState<string>("U1");
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -150,21 +151,34 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
       setRestCountdown(remaining);
       if (remaining <= 0 && !restTimerDone) {
         setRestTimerDone(true);
-        try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
-        // Initial 3 rapid beeps
-        playAlertBeeps(3, 880, 150, 100);
-        // Repeat 2 beeps + vibrate every 3s until dismissed
-        if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-        soundIntervalRef.current = setInterval(() => {
-          playAlertBeeps(2, 880, 150, 100);
-          try { navigator.vibrate?.([200, 100, 200]); } catch {}
-        }, 3000);
+        // Only sound/vibrate while this tab is active — a rest that completes
+        // off-tab would otherwise beep unreachably (GO overlay still shows on return).
+        if (active) {
+          try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
+          // Initial 3 rapid beeps
+          playAlertBeeps(3, 880, 150, 100);
+          // Repeat 2 beeps + vibrate every 3s until dismissed
+          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+          soundIntervalRef.current = setInterval(() => {
+            playAlertBeeps(2, 880, 150, 100);
+            try { navigator.vibrate?.([200, 100, 200]); } catch {}
+          }, 3000);
+        }
       }
     };
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [restTimerEnd, restTimerDone, playAlertBeeps]);
+  }, [restTimerEnd, restTimerDone, playAlertBeeps, active]);
+
+  // Silence the repeating rest-complete alert when this tab isn't active
+  // (prevents unreachable off-tab beeping; the GO overlay still shows on return).
+  useEffect(() => {
+    if (!active && soundIntervalRef.current) {
+      clearInterval(soundIntervalRef.current);
+      soundIntervalRef.current = undefined;
+    }
+  }, [active]);
 
   // Clean up rest done timer on unmount
   useEffect(() => {
@@ -597,21 +611,8 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
         );
       })()}
 
-      {/* Full-screen GO overlay — visible from across the room */}
-      {restTimerDone && (
-        <div
-          className="fixed inset-0 z-10 flex flex-col items-center justify-center go-overlay-pulse"
-          onClick={dismissRestTimer}
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="text-7xl font-black text-green-400 go-text-pulse">GO</div>
-          <div className="text-sm text-gray-400 mt-4">tap to dismiss</div>
-        </div>
-      )}
-
-      {/* Unified timer display — sticky so it's visible during later exercises */}
-      <div className={`flex items-center justify-center mb-3 ${restTimerEnd ? "sticky top-0 z-20 py-2 -mx-4 px-4 bg-gray-950/90 backdrop-blur-sm" : ""}`}>
+      {/* Floating clock — shared shell with the Prehab tab (fixed position + GO overlay) */}
+      <FloatingTimerDock showGo={restTimerDone} onDismissGo={dismissRestTimer}>
         <button
           onClick={() => { initAudioCtx(); if (!longPressFiredRef.current) setTimerRunning((r) => !r); }}
           onTouchStart={handleTimerLongPressStart}
@@ -622,8 +623,8 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
           aria-label={restTimerEnd
             ? (restTimerDone ? "Rest complete. Long-press to dismiss." : `Rest: ${restCountdown} seconds. Tap to ${timerRunning ? "pause" : "resume"} stopwatch. Long-press to reset rest timer.`)
             : (timerRunning ? "Pause stopwatch" : "Start stopwatch")}
-          className={`bg-gray-800/70 rounded-xl px-6 py-2 touch-target hover:bg-gray-700/70 active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 ${
-            restTimerDone ? "bg-green-600/20 rest-done-flash" : ""
+          className={`pointer-events-auto rounded-2xl px-5 py-2 shadow-lg ring-1 ring-gray-800/60 touch-target active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            restTimerDone ? "bg-green-600/20 rest-done-flash" : "bg-gray-900/90 backdrop-blur-sm hover:bg-gray-800/90"
           }`}
           role="timer"
         >
@@ -648,7 +649,7 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
             </span>
           )}
         </button>
-      </div>
+      </FloatingTimerDock>
 
       {/* Progress bar */}
       {totalSets > 0 && (
@@ -836,6 +837,9 @@ export default function TodayWorkout({ onActiveChange }: { onActiveChange?: (act
           }}
         />
       )}
+
+      {/* Spacer so the floating clock doesn't cover the last content */}
+      <div aria-hidden="true" className="h-20" />
     </div>
   );
 }
