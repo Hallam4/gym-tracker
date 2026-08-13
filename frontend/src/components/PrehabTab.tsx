@@ -18,7 +18,8 @@ export default function PrehabTab() {
   const { levels, setLevel } = usePrehabLevels();
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    shoulders: true,
+    shoulderrehab: true,
+    shoulders: false,
     lowerback: false,
     proprioception: false,
     assessment: false,

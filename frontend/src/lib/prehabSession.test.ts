@@ -6,8 +6,8 @@ import {
   clampLevel, activeExercise,
 } from "./prehabSession";
 
-const bellyPressIr = PREHAB_SECTIONS[0].exercises[0]; // sets: 3
-const backExt = PREHAB_SECTIONS[1].exercises[0]; // lowerback progression, id "back-ext-progression"
+const srExercise = PREHAB_SECTIONS[0].exercises[0]; // sr-prone-ha from shoulderrehab, sets: 3
+const backExt = PREHAB_SECTIONS[2].exercises[0]; // lowerback progression, id "back-ext-progression"
 
 describe("prehabSession", () => {
   it("emptyDayState has the given date and no entries", () => {
@@ -25,20 +25,20 @@ describe("prehabSession", () => {
   });
 
   it("isExerciseDone is true only when setsDone >= sets", () => {
-    expect(isExerciseDone(bellyPressIr, undefined)).toBe(false);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 2 })).toBe(false);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 3 })).toBe(true);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 4 })).toBe(true);
+    expect(isExerciseDone(srExercise, undefined)).toBe(false);
+    expect(isExerciseDone(srExercise, { setsDone: 2 })).toBe(false);
+    expect(isExerciseDone(srExercise, { setsDone: 3 })).toBe(true);
+    expect(isExerciseDone(srExercise, { setsDone: 4 })).toBe(true);
   });
 
   it("sectionProgress counts finished exercises in a section", () => {
-    const state = { date: "d", entries: { "belly-press-ir": { setsDone: 3 } } };
-    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 4 });
+    const state = { date: "d", entries: { "closed-chain-progression": { setsDone: 2 } } };
+    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 2 });
   });
 
-  it("overallProgress sums across all sections (6 total)", () => {
+  it("overallProgress sums across all sections (5 total)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 9 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 7 });
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -46,7 +46,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(9);
+    expect(entry.total).toBe(7);
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
@@ -71,7 +71,7 @@ describe("prehabSession", () => {
   });
 
   it("activeExercise returns simple exercises unchanged", () => {
-    expect(activeExercise(bellyPressIr, 3)).toBe(bellyPressIr);
+    expect(activeExercise(srExercise, 3)).toBe(srExercise);
   });
 
   it("sectionProgress for lowerback respects the active level's set count", () => {
@@ -83,7 +83,7 @@ describe("prehabSession", () => {
   });
 
   it("pull ladder resolves its levels like other progressions", () => {
-    const pull = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "pull-ladder")!;
+    const pull = PREHAB_SECTIONS[1].exercises.find((e) => e.id === "pull-ladder")!;
     expect(pull.levels).toHaveLength(3);
     expect(activeExercise(pull, 1).sets).toBe(3);
     expect(activeExercise(pull, 3).kind).toBe("reps");
@@ -91,7 +91,7 @@ describe("prehabSession", () => {
   });
 
   it("pack ladder resolves its levels like other progressions", () => {
-    const pack = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "closed-chain-progression")!;
+    const pack = PREHAB_SECTIONS[1].exercises.find((e) => e.id === "closed-chain-progression")!;
     expect(pack.levels).toHaveLength(3);
     expect(activeExercise(pack, 1).kind).toBe("hold");
     expect(activeExercise(pack, 3).kind).toBe("reps");
@@ -100,10 +100,10 @@ describe("prehabSession", () => {
 
   it("overallProgress and buildLogEntry exclude the non-daily assessment section", () => {
     const state = { date: "d", entries: {} };
-    expect(PREHAB_SECTIONS.length).toBe(4);            // 4 sections exist…
-    expect(overallProgress(state)).toEqual({ done: 0, total: 9 }); // …but only 9 daily exercises count
+    expect(PREHAB_SECTIONS.length).toBe(5);            // 5 sections exist…
+    expect(overallProgress(state)).toEqual({ done: 0, total: 7 }); // …but only 7 daily exercises count
     const entry = buildLogEntry(state);
-    expect(entry.total).toBe(9);
+    expect(entry.total).toBe(7);
     expect(entry.sections.assessment).toBeUndefined();
   });
 
