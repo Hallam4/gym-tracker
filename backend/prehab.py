@@ -4,12 +4,13 @@ Mirrors history.py: pure row build/parse helpers plus thin Google Sheets I/O.
 A row is: Date | Shoulders | Lower Back | Proprioception | Total, where each
 section/total cell is "done/total". Dedup is by date (one row per day).
 """
+import json
 import sheets_client
-from models import PrehabCompleteRequest, PrehabSession, PrehabSectionProgress
+from models import PrehabCompleteRequest, PrehabSession, PrehabSectionProgress, PrehabDetail
 
 PREHAB_TAB = "Prehab"
 SECTION_ORDER = ["shoulders", "lowerback", "proprioception"]
-PREHAB_HEADER = ["Date", "Shoulders", "Lower Back", "Proprioception", "Total", "Notes"]
+PREHAB_HEADER = ["Date", "Shoulders", "Lower Back", "Proprioception", "Total", "Notes", "Detail"]
 
 
 def _safe_get(row: list[str], idx: int) -> str:
@@ -24,7 +25,32 @@ def prehab_row(req: PrehabCompleteRequest) -> list[str]:
         cells.append(f"{p.done}/{p.total}")
     cells.append(f"{req.done}/{req.total}")
     cells.append(req.notes)
+    cells.append(_detail_to_cell(req.detail))
     return cells
+
+
+def _detail_to_cell(detail: PrehabDetail | None) -> str:
+    if detail is None:
+        return ""
+    payload: dict = {}
+    if detail.shoulderrehab is not None:
+        payload["shoulderrehab"] = {"done": detail.shoulderrehab.done, "total": detail.shoulderrehab.total}
+    if detail.weights:
+        payload["weights"] = detail.weights
+    return json.dumps(payload, separators=(",", ":")) if payload else ""
+
+
+def _parse_detail(cell: str) -> PrehabDetail | None:
+    if not cell:
+        return None
+    try:
+        data = json.loads(cell)
+    except (ValueError, TypeError):
+        return None
+    sr = data.get("shoulderrehab")
+    shoulderrehab = PrehabSectionProgress(done=int(sr["done"]), total=int(sr["total"])) if sr else None
+    weights = {str(k): str(v) for k, v in (data.get("weights") or {}).items()}
+    return PrehabDetail(shoulderrehab=shoulderrehab, weights=weights)
 
 
 def _parse_pair(cell: str) -> PrehabSectionProgress:
@@ -43,7 +69,8 @@ def parse_prehab_row(row: list[str]) -> PrehabSession | None:
     sections = {sid: _parse_pair(_safe_get(row, i + 1)) for i, sid in enumerate(SECTION_ORDER)}
     total = _parse_pair(_safe_get(row, 1 + len(SECTION_ORDER)))
     notes = _safe_get(row, 2 + len(SECTION_ORDER))
-    return PrehabSession(date=date, done=total.done, total=total.total, sections=sections, notes=notes)
+    detail = _parse_detail(_safe_get(row, 3 + len(SECTION_ORDER)))
+    return PrehabSession(date=date, done=total.done, total=total.total, sections=sections, notes=notes, detail=detail)
 
 
 def find_row_index(rows: list[list[str]], date: str) -> int | None:
