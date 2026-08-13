@@ -3,11 +3,12 @@ import { PREHAB_SECTIONS } from "../data/prehabData";
 import {
   emptyDayState, rollIfNewDay, isExerciseDone,
   sectionProgress, overallProgress, buildLogEntry,
-  clampLevel, activeExercise,
+  clampLevel, activeExercise, DayState,
+  weekStartMonday, shoulderRehabThisWeek, LogEntry,
 } from "./prehabSession";
 
-const bellyPressIr = PREHAB_SECTIONS[0].exercises[0]; // sets: 3
-const backExt = PREHAB_SECTIONS[1].exercises[0]; // lowerback progression, id "back-ext-progression"
+const srExercise = PREHAB_SECTIONS[0].exercises[0]; // sr-prone-ha from shoulderrehab, sets: 3
+const backExt = PREHAB_SECTIONS[2].exercises[0]; // lowerback progression, id "back-ext-progression"
 
 describe("prehabSession", () => {
   it("emptyDayState has the given date and no entries", () => {
@@ -25,20 +26,20 @@ describe("prehabSession", () => {
   });
 
   it("isExerciseDone is true only when setsDone >= sets", () => {
-    expect(isExerciseDone(bellyPressIr, undefined)).toBe(false);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 2 })).toBe(false);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 3 })).toBe(true);
-    expect(isExerciseDone(bellyPressIr, { setsDone: 4 })).toBe(true);
+    expect(isExerciseDone(srExercise, undefined)).toBe(false);
+    expect(isExerciseDone(srExercise, { setsDone: 2 })).toBe(false);
+    expect(isExerciseDone(srExercise, { setsDone: 3 })).toBe(true);
+    expect(isExerciseDone(srExercise, { setsDone: 4 })).toBe(true);
   });
 
   it("sectionProgress counts finished exercises in a section", () => {
-    const state = { date: "d", entries: { "belly-press-ir": { setsDone: 3 } } };
-    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 4 });
+    const state = { date: "d", entries: { "closed-chain-progression": { setsDone: 2 } } };
+    expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 2 });
   });
 
-  it("overallProgress sums across all sections (6 total)", () => {
+  it("overallProgress sums across all sections (5 total)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 9 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 7 });
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -46,7 +47,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(9);
+    expect(entry.total).toBe(7);
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
@@ -71,7 +72,7 @@ describe("prehabSession", () => {
   });
 
   it("activeExercise returns simple exercises unchanged", () => {
-    expect(activeExercise(bellyPressIr, 3)).toBe(bellyPressIr);
+    expect(activeExercise(srExercise, 3)).toBe(srExercise);
   });
 
   it("sectionProgress for lowerback respects the active level's set count", () => {
@@ -83,7 +84,7 @@ describe("prehabSession", () => {
   });
 
   it("pull ladder resolves its levels like other progressions", () => {
-    const pull = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "pull-ladder")!;
+    const pull = PREHAB_SECTIONS[1].exercises.find((e) => e.id === "pull-ladder")!;
     expect(pull.levels).toHaveLength(3);
     expect(activeExercise(pull, 1).sets).toBe(3);
     expect(activeExercise(pull, 3).kind).toBe("reps");
@@ -91,7 +92,7 @@ describe("prehabSession", () => {
   });
 
   it("pack ladder resolves its levels like other progressions", () => {
-    const pack = PREHAB_SECTIONS[0].exercises.find((e) => e.id === "closed-chain-progression")!;
+    const pack = PREHAB_SECTIONS[1].exercises.find((e) => e.id === "closed-chain-progression")!;
     expect(pack.levels).toHaveLength(3);
     expect(activeExercise(pack, 1).kind).toBe("hold");
     expect(activeExercise(pack, 3).kind).toBe("reps");
@@ -100,10 +101,10 @@ describe("prehabSession", () => {
 
   it("overallProgress and buildLogEntry exclude the non-daily assessment section", () => {
     const state = { date: "d", entries: {} };
-    expect(PREHAB_SECTIONS.length).toBe(4);            // 4 sections exist…
-    expect(overallProgress(state)).toEqual({ done: 0, total: 9 }); // …but only 9 daily exercises count
+    expect(PREHAB_SECTIONS.length).toBe(5);            // 5 sections exist…
+    expect(overallProgress(state)).toEqual({ done: 0, total: 7 }); // …but only 7 daily exercises count
     const entry = buildLogEntry(state);
-    expect(entry.total).toBe(9);
+    expect(entry.total).toBe(7);
     expect(entry.sections.assessment).toBeUndefined();
   });
 
@@ -112,4 +113,52 @@ describe("prehabSession", () => {
     expect(buildLogEntry(state).notes).toBe("R felt tweaky");
   });
 
+});
+
+const day = (entries: DayState["entries"]): DayState => ({ date: "2026-08-13", entries });
+
+describe("buildLogEntry — detail payload", () => {
+  it("collects only non-empty weights, keyed by exercise id", () => {
+    const e = buildLogEntry(day({
+      "sr-scaption": { setsDone: 3, weight: "5" },
+      "sr-prone-l": { setsDone: 1, weight: "" },
+      "sr-side-lying-er": { setsDone: 2 },
+    }));
+    expect(e.detail!.weights).toEqual({ "sr-scaption": "5" });
+  });
+
+  it("reports shoulder-rehab section progress", () => {
+    const entries: DayState["entries"] = {};
+    for (const id of ["sr-prone-ha", "sr-prone-l", "sr-prone-t", "sr-supine-rotation", "sr-side-lying-er", "sr-scaption", "sr-banded-ir-90"]) {
+      entries[id] = { setsDone: 3 };
+    }
+    const e = buildLogEntry(day(entries));
+    expect(e.detail!.shoulderrehab).toEqual({ done: 7, total: 7 });
+  });
+
+  it("keeps the daily sections list and total unchanged (shoulder-rehab excluded)", () => {
+    const e = buildLogEntry(day({ "sr-scaption": { setsDone: 3, weight: "5" } }));
+    expect(Object.keys(e.sections)).toEqual(["shoulders", "lowerback", "proprioception"]);
+    expect(e.done).toBe(0);
+  });
+});
+
+describe("shoulder-rehab weekly count", () => {
+  it("weekStartMonday returns the Monday of that week", () => {
+    expect(weekStartMonday("2026-08-13")).toBe("2026-08-10"); // Thu → Mon 10 Aug
+  });
+
+  it("counts distinct in-week days where shoulder rehab was done", () => {
+    const mk = (date: string, done: number): LogEntry => ({
+      date, done: 0, total: 0, sections: {} as any,
+      detail: { shoulderrehab: { done, total: 7 }, weights: {} },
+    });
+    const log = [
+      mk("2026-08-10", 7), // Mon, done
+      mk("2026-08-12", 3), // Wed, partial but done>0
+      mk("2026-08-11", 0), // Tue, not done
+      mk("2026-08-09", 7), // prev-week Sun, excluded
+    ];
+    expect(shoulderRehabThisWeek(log, "2026-08-13")).toBe(2);
+  });
 });

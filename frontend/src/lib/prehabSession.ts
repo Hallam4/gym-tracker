@@ -22,6 +22,12 @@ export interface LogEntry {
   total: number;
   sections: Record<SectionId, SectionProgress>;
   notes?: string;
+  detail?: PrehabDetail;
+}
+
+export interface PrehabDetail {
+  shoulderrehab?: SectionProgress;
+  weights: Record<string, string>;
 }
 
 export function emptyDayState(date: string): DayState {
@@ -73,5 +79,24 @@ export function buildLogEntry(state: DayState, levels: Record<string, number> = 
     PREHAB_SECTIONS.filter((s) => s.daily !== false).map((s) => [s.id, sectionProgress(s.id, state, levels)])
   ) as Record<SectionId, SectionProgress>;
   const overall = overallProgress(state, levels);
-  return { date: state.date, done: overall.done, total: overall.total, sections, notes: state.notes ?? "" };
+  const weights: Record<string, string> = {};
+  for (const [exId, entry] of Object.entries(state.entries)) {
+    if (entry.weight != null && entry.weight !== "") weights[exId] = entry.weight;
+  }
+  const detail: PrehabDetail = { shoulderrehab: sectionProgress("shoulderrehab", state, levels), weights };
+  return { date: state.date, done: overall.done, total: overall.total, sections, notes: state.notes ?? "", detail };
+}
+
+export function weekStartMonday(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const dow = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+export function shoulderRehabThisWeek(log: LogEntry[], today: string): number {
+  const start = weekStartMonday(today);
+  return log.filter(
+    (e) => e.date >= start && e.date <= today && (e.detail?.shoulderrehab?.done ?? 0) > 0
+  ).length;
 }

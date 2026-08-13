@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { PREHAB_SECTIONS, SectionId, PrehabExercise } from "../data/prehabData";
 import { usePrehabSession } from "../hooks/usePrehabSession";
 import { useSessionTimer } from "../hooks/useSessionTimer";
-import { overallProgress, sectionProgress, activeExercise } from "../lib/prehabSession";
+import { overallProgress, sectionProgress, activeExercise, shoulderRehabThisWeek } from "../lib/prehabSession";
 import { usePrehabLevels } from "../hooks/usePrehabLevels";
 import SessionTimer from "./SessionTimer";
 import PrehabSection from "./PrehabSection";
@@ -18,7 +18,8 @@ export default function PrehabTab() {
   const { levels, setLevel } = usePrehabLevels();
   const timer = useSessionTimer(TIMER_KEY);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    shoulders: true,
+    shoulderrehab: true,
+    shoulders: false,
     lowerback: false,
     proprioception: false,
     assessment: false,
@@ -37,6 +38,9 @@ export default function PrehabTab() {
 
   const overall = overallProgress(day, levels);
   const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0;
+  const srToday = sectionProgress("shoulderrehab", day, levels);
+  const srWeek = shoulderRehabThisWeek(log, day.date);
+  const hasProgress = overall.done > 0 || srToday.done > 0;
 
   // Look up an exercise to decide whether logging a set should start a rest.
   const exById = (exId: string): PrehabExercise | undefined =>
@@ -76,6 +80,13 @@ export default function PrehabTab() {
         </span>
       </div>
 
+      <div className="mb-4 -mt-2 flex items-center gap-2 text-xs">
+        <span className="px-2 py-1 rounded-lg bg-gray-800/60 text-gray-300">
+          🩺 Shoulder rehab: <span className="tabular-nums">{srWeek}/3</span> this week
+          {srToday.done > 0 && <span className="text-gray-500"> · today {srToday.done}/{srToday.total}</span>}
+        </span>
+      </div>
+
       {/* Sections */}
       {PREHAB_SECTIONS.map((section) => (
         <PrehabSection
@@ -108,11 +119,11 @@ export default function PrehabTab() {
       {/* Complete */}
       <button
         onClick={handleComplete}
-        disabled={overall.done === 0 || isSaving}
+        disabled={!hasProgress || isSaving}
         className={`w-full mt-4 py-4 rounded-2xl font-bold text-lg touch-target transition-all duration-200 active:scale-[0.98] ${
           justSaved
             ? "bg-green-600 text-white"
-            : overall.done === 0 || isSaving
+            : !hasProgress || isSaving
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-700/25 hover:brightness-110"
         }`}

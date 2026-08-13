@@ -182,12 +182,18 @@ export interface PrehabSectionProgress {
   total: number;
 }
 
+export interface PrehabDetail {
+  shoulderrehab?: PrehabSectionProgress;
+  weights: Record<string, string>;
+}
+
 export interface PrehabSession {
   date: string;
   done: number;
   total: number;
   sections: Record<string, PrehabSectionProgress>;
   notes: string;
+  detail?: PrehabDetail;
 }
 
 export interface PrehabHistoryResponse {
@@ -200,6 +206,7 @@ export interface PrehabCompleteRequest {
   total: number;
   sections: Record<string, PrehabSectionProgress>;
   notes: string;
+  detail?: PrehabDetail;
 }
 
 export const api = {

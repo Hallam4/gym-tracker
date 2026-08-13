@@ -15,7 +15,7 @@ def _req(date="2026-06-29", sh=(4, 4), lb=(3, 3), pr=(1, 1), done=8, total=8, no
 
 
 def test_prehab_row_serializes_in_order():
-    assert prehab.prehab_row(_req()) == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]
+    assert prehab.prehab_row(_req()) == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", "", ""]
 
 
 def test_parse_prehab_row_roundtrip():
@@ -75,7 +75,7 @@ def test_save_prehab_session_appends_when_absent(monkeypatch):
     monkeypatch.setattr(prehab.sheets_client, "append_rows", lambda tab, r: appended.extend(r))
     monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: (_ for _ in ()).throw(AssertionError("must not write_cells")))
     prehab.save_prehab_session(_req(date="2026-06-29"))
-    assert appended == [["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]]
+    assert appended == [["2026-06-29", "4/4", "3/3", "1/1", "8/8", "", ""]]
 
 
 def test_save_prehab_session_overwrites_existing_date(monkeypatch):
@@ -86,7 +86,7 @@ def test_save_prehab_session_overwrites_existing_date(monkeypatch):
     monkeypatch.setattr(prehab.sheets_client, "write_cells", lambda tab, u: writes.extend(u))
     prehab.save_prehab_session(_req(date="2026-06-29"))
     assert {w["row"] for w in writes} == {1}
-    assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", ""]
+    assert [w["value"] for w in writes] == ["2026-06-29", "4/4", "3/3", "1/1", "8/8", "", ""]
 
 
 def test_get_prehab_history_endpoint(monkeypatch):
@@ -129,3 +129,54 @@ def test_complete_prehab_endpoint(monkeypatch):
         assert captured["req"].date == "2026-06-29"
     finally:
         main.app.dependency_overrides.clear()
+
+
+def test_prehab_row_serializes_detail_json():
+    from models import PrehabDetail
+    req = _req(date="2026-08-13")
+    req.detail = PrehabDetail(
+        shoulderrehab=PrehabSectionProgress(done=6, total=7),
+        weights={"sr-scaption": "5", "sr-side-lying-er": "4"},
+    )
+    row = prehab.prehab_row(req)
+    assert row[6] == '{"shoulderrehab":{"done":6,"total":7},"weights":{"sr-scaption":"5","sr-side-lying-er":"4"}}'
+
+
+def test_parse_prehab_row_reads_detail_roundtrip():
+    from models import PrehabDetail
+    req = _req(date="2026-08-13")
+    req.detail = PrehabDetail(shoulderrehab=PrehabSectionProgress(done=7, total=7), weights={"sr-scaption": "6"})
+    s = prehab.parse_prehab_row(prehab.prehab_row(req))
+    assert s is not None
+    assert s.detail is not None
+    assert (s.detail.shoulderrehab.done, s.detail.shoulderrehab.total) == (7, 7)
+    assert s.detail.weights == {"sr-scaption": "6"}
+
+
+def test_parse_legacy_row_without_detail_column():
+    # Rows written before the Detail column parse with detail=None.
+    s = prehab.parse_prehab_row(["2026-06-29", "4/4", "3/3", "1/1", "8/8", "note"])
+    assert s is not None
+    assert s.notes == "note"
+    assert s.detail is None
+
+
+def test_parse_detail_malformed_returns_none():
+    # Malformed Detail cells (structurally invalid JSON) do not crash the row parse; detail=None.
+    # Case 1: missing "done" key
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", '{"shoulderrehab":{"total":7}}'])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None
+
+    # Case 2: valid JSON but not a dict (bare int)
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", "5"])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None
+
+    # Case 3: shoulderrehab is a list instead of dict
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", '{"shoulderrehab":[1,2]}'])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None

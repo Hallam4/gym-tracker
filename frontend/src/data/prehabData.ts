@@ -1,4 +1,4 @@
-export type SectionId = "shoulders" | "lowerback" | "proprioception" | "assessment";
+export type SectionId = "shoulderrehab" | "shoulders" | "lowerback" | "proprioception" | "assessment";
 export type ExerciseKind = "loaded" | "hold" | "reps";
 
 export interface PrehabLevel {
@@ -123,12 +123,25 @@ const SHOULDER_ROTATION_ASSESSMENT_LEVELS: PrehabLevel[] = [
 
 export const PREHAB_SECTIONS: PrehabSectionDef[] = [
   {
+    id: "shoulderrehab",
+    label: "Shoulder Rehab",
+    icon: "🩺",
+    daily: false, // Adham's clinician block: 2–3×/wk, rest day between — shown but excluded from the daily %
+    exercises: [
+      { id: "sr-prone-ha", name: "Prone Horizontal Abduction", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["prone", "arms out → arch overhead", "blades back+down"], note: "Adham · PhysiApp hjixuzwx · 2–3×/wk · add weight to progress", weightStep: 0.5 },
+      { id: "sr-prone-l", name: "Prone L Raise (weighted ball)", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["lower trap", "elbows to 90°", "palms face in"], weightStep: 0.5 },
+      { id: "sr-prone-t", name: "Prone T Raise (weighted ball)", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["mid trap", "palms forward", "squeeze blades"], weightStep: 0.5 },
+      { id: "sr-supine-rotation", name: "Supine IR/ER @90°", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["arm at 90°", "blades on floor", "control the weight"], weightStep: 1.25 },
+      { id: "sr-side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["good side down", "elbow tucked", "blades back+down"], weightStep: 1.25 },
+      { id: "sr-scaption", name: "Scaption", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["scapular plane", "no shrug", "control down"], weightStep: 1.25 },
+      { id: "sr-banded-ir-90", name: "Banded IR @90°", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["band tied behind you", "elbow at 90°", "blades back+down"], weightStep: 1.25 },
+    ],
+  },
+  {
     id: "shoulders",
     label: "Shoulders",
     icon: "🦾",
     exercises: [
-      { id: "belly-press-ir", name: "Belly-Press IR (subscap)", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["band/light", "elbow tucked"], weightStep: 1.25 },
-      { id: "side-lying-er", name: "Side-Lying ER", kind: "loaded", sets: 3, prescription: "3×12–15", tags: ["light", "full comfortable range"], weightStep: 1.25 },
       {
         id: "closed-chain-progression",
         name: "Pack",

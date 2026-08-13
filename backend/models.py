@@ -164,12 +164,18 @@ class PrehabSectionProgress(BaseModel):
     total: int
 
 
+class PrehabDetail(BaseModel):
+    shoulderrehab: PrehabSectionProgress | None = None
+    weights: dict[str, str] = {}
+
+
 class PrehabCompleteRequest(BaseModel):
     date: str
     done: int
     total: int
     sections: dict[str, PrehabSectionProgress]
     notes: str = ""
+    detail: PrehabDetail | None = None
 
 
 class PrehabSession(BaseModel):
@@ -178,6 +184,7 @@ class PrehabSession(BaseModel):
     total: int
     sections: dict[str, PrehabSectionProgress]
     notes: str = ""
+    detail: PrehabDetail | None = None
 
 
 class PrehabHistoryResponse(BaseModel):
