@@ -159,3 +159,24 @@ def test_parse_legacy_row_without_detail_column():
     assert s is not None
     assert s.notes == "note"
     assert s.detail is None
+
+
+def test_parse_detail_malformed_returns_none():
+    # Malformed Detail cells (structurally invalid JSON) do not crash the row parse; detail=None.
+    # Case 1: missing "done" key
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", '{"shoulderrehab":{"total":7}}'])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None
+
+    # Case 2: valid JSON but not a dict (bare int)
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", "5"])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None
+
+    # Case 3: shoulderrehab is a list instead of dict
+    s = prehab.parse_prehab_row(["2026-08-13", "4/4", "3/3", "1/1", "8/8", "", '{"shoulderrehab":[1,2]}'])
+    assert s is not None
+    assert s.date == "2026-08-13"
+    assert s.detail is None

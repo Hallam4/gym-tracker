@@ -45,12 +45,14 @@ def _parse_detail(cell: str) -> PrehabDetail | None:
         return None
     try:
         data = json.loads(cell)
-    except (ValueError, TypeError):
+        if not isinstance(data, dict):
+            return None
+        sr = data.get("shoulderrehab")
+        shoulderrehab = PrehabSectionProgress(done=int(sr["done"]), total=int(sr["total"])) if sr else None
+        weights = {str(k): str(v) for k, v in (data.get("weights") or {}).items()}
+        return PrehabDetail(shoulderrehab=shoulderrehab, weights=weights)
+    except Exception:
         return None
-    sr = data.get("shoulderrehab")
-    shoulderrehab = PrehabSectionProgress(done=int(sr["done"]), total=int(sr["total"])) if sr else None
-    weights = {str(k): str(v) for k, v in (data.get("weights") or {}).items()}
-    return PrehabDetail(shoulderrehab=shoulderrehab, weights=weights)
 
 
 def _parse_pair(cell: str) -> PrehabSectionProgress:
