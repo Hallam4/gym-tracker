@@ -86,3 +86,17 @@ export function buildLogEntry(state: DayState, levels: Record<string, number> = 
   const detail: PrehabDetail = { shoulderrehab: sectionProgress("shoulderrehab", state, levels), weights };
   return { date: state.date, done: overall.done, total: overall.total, sections, notes: state.notes ?? "", detail };
 }
+
+export function weekStartMonday(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const dow = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+export function shoulderRehabThisWeek(log: LogEntry[], today: string): number {
+  const start = weekStartMonday(today);
+  return log.filter(
+    (e) => e.date >= start && e.date <= today && (e.detail?.shoulderrehab?.done ?? 0) > 0
+  ).length;
+}

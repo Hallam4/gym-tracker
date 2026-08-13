@@ -4,6 +4,7 @@ import {
   emptyDayState, rollIfNewDay, isExerciseDone,
   sectionProgress, overallProgress, buildLogEntry,
   clampLevel, activeExercise, DayState,
+  weekStartMonday, shoulderRehabThisWeek, LogEntry,
 } from "./prehabSession";
 
 const srExercise = PREHAB_SECTIONS[0].exercises[0]; // sr-prone-ha from shoulderrehab, sets: 3
@@ -139,5 +140,25 @@ describe("buildLogEntry — detail payload", () => {
     const e = buildLogEntry(day({ "sr-scaption": { setsDone: 3, weight: "5" } }));
     expect(Object.keys(e.sections)).toEqual(["shoulders", "lowerback", "proprioception"]);
     expect(e.done).toBe(0);
+  });
+});
+
+describe("shoulder-rehab weekly count", () => {
+  it("weekStartMonday returns the Monday of that week", () => {
+    expect(weekStartMonday("2026-08-13")).toBe("2026-08-10"); // Thu → Mon 10 Aug
+  });
+
+  it("counts distinct in-week days where shoulder rehab was done", () => {
+    const mk = (date: string, done: number): LogEntry => ({
+      date, done: 0, total: 0, sections: {} as any,
+      detail: { shoulderrehab: { done, total: 7 }, weights: {} },
+    });
+    const log = [
+      mk("2026-08-10", 7), // Mon, done
+      mk("2026-08-12", 3), // Wed, partial but done>0
+      mk("2026-08-11", 0), // Tue, not done
+      mk("2026-08-09", 7), // prev-week Sun, excluded
+    ];
+    expect(shoulderRehabThisWeek(log, "2026-08-13")).toBe(2);
   });
 });
