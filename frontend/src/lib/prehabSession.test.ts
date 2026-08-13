@@ -3,7 +3,7 @@ import { PREHAB_SECTIONS } from "../data/prehabData";
 import {
   emptyDayState, rollIfNewDay, isExerciseDone,
   sectionProgress, overallProgress, buildLogEntry,
-  clampLevel, activeExercise,
+  clampLevel, activeExercise, DayState,
 } from "./prehabSession";
 
 const srExercise = PREHAB_SECTIONS[0].exercises[0]; // sr-prone-ha from shoulderrehab, sets: 3
@@ -112,4 +112,32 @@ describe("prehabSession", () => {
     expect(buildLogEntry(state).notes).toBe("R felt tweaky");
   });
 
+});
+
+const day = (entries: DayState["entries"]): DayState => ({ date: "2026-08-13", entries });
+
+describe("buildLogEntry — detail payload", () => {
+  it("collects only non-empty weights, keyed by exercise id", () => {
+    const e = buildLogEntry(day({
+      "sr-scaption": { setsDone: 3, weight: "5" },
+      "sr-prone-l": { setsDone: 1, weight: "" },
+      "sr-side-lying-er": { setsDone: 2 },
+    }));
+    expect(e.detail!.weights).toEqual({ "sr-scaption": "5" });
+  });
+
+  it("reports shoulder-rehab section progress", () => {
+    const entries: DayState["entries"] = {};
+    for (const id of ["sr-prone-ha", "sr-prone-l", "sr-prone-t", "sr-supine-rotation", "sr-side-lying-er", "sr-scaption", "sr-banded-ir-90"]) {
+      entries[id] = { setsDone: 3 };
+    }
+    const e = buildLogEntry(day(entries));
+    expect(e.detail!.shoulderrehab).toEqual({ done: 7, total: 7 });
+  });
+
+  it("keeps the daily sections list and total unchanged (shoulder-rehab excluded)", () => {
+    const e = buildLogEntry(day({ "sr-scaption": { setsDone: 3, weight: "5" } }));
+    expect(Object.keys(e.sections)).toEqual(["shoulders", "lowerback", "proprioception"]);
+    expect(e.done).toBe(0);
+  });
 });
