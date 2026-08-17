@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { PREHAB_SECTIONS, SectionId, PrehabExercise } from "../data/prehabData";
 import { usePrehabSession } from "../hooks/usePrehabSession";
 import { useSessionTimer } from "../hooks/useSessionTimer";
-import { overallProgress, sectionProgress, activeExercise, shoulderRehabThisWeek } from "../lib/prehabSession";
+import { overallProgress, sectionProgress, activeExercise, shoulderRehabThisWeek, sessionTotal } from "../lib/prehabSession";
 import { usePrehabLevels } from "../hooks/usePrehabLevels";
 import SessionTimer from "./SessionTimer";
 import PrehabSection from "./PrehabSection";
@@ -136,19 +136,22 @@ export default function PrehabTab() {
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent Log</h3>
           <div className="space-y-2">
-            {log.slice(0, 20).map((entry) => (
+            {log.slice(0, 20).map((entry) => {
+              const t = sessionTotal(entry);
+              return (
               <div key={entry.date} className="px-4 py-2.5 bg-gray-800/40 rounded-xl">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-300">{fmtDate(entry.date)}</span>
-                  <span className={`text-sm font-medium ${entry.done === entry.total ? "text-green-400" : "text-gray-400"}`}>
-                    {entry.done}/{entry.total}
+                  <span className={`text-sm font-medium ${t.total > 0 && t.done === t.total ? "text-green-400" : "text-gray-400"}`}>
+                    {t.done}/{t.total}
                   </span>
                 </div>
                 {entry.notes && (
                   <p className="mt-1 text-xs text-gray-400 whitespace-pre-wrap">📝 {entry.notes}</p>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

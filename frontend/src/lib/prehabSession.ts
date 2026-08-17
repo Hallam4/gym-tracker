@@ -64,8 +64,16 @@ export function sectionProgress(sectionId: SectionId, state: DayState, levels: R
   return { done, total: section.exercises.length };
 }
 
+// Sections that count toward the overall daily total/%. Only the one-off
+// "assessment" tool is excluded; shoulder rehab counts toward the total
+// (user decision, 17 Aug 2026) even though daily:false keeps it out of the
+// three sheet section-columns.
+export function countsTowardTotal(id: SectionId): boolean {
+  return id !== "assessment";
+}
+
 export function overallProgress(state: DayState, levels: Record<string, number> = {}): SectionProgress {
-  return PREHAB_SECTIONS.filter((s) => s.daily !== false).reduce<SectionProgress>(
+  return PREHAB_SECTIONS.filter((s) => countsTowardTotal(s.id)).reduce<SectionProgress>(
     (acc, s) => {
       const p = sectionProgress(s.id, state, levels);
       return { done: acc.done + p.done, total: acc.total + p.total };
@@ -85,6 +93,21 @@ export function buildLogEntry(state: DayState, levels: Record<string, number> = 
   }
   const detail: PrehabDetail = { shoulderrehab: sectionProgress("shoulderrehab", state, levels), weights };
   return { date: state.date, done: overall.done, total: overall.total, sections, notes: state.notes ?? "", detail };
+}
+
+/**
+ * Displayed total for a logged session = the daily section-columns plus the
+ * shoulder-rehab block (from detail). Reconstructed from stored parts rather
+ * than the row's Total cell, so rows saved before rehab counted toward the
+ * total (Total="0/7") still display correctly (e.g. 7/14, not 0/7).
+ */
+export function sessionTotal(entry: LogEntry): SectionProgress {
+  const daily = Object.values(entry.sections).reduce<SectionProgress>(
+    (acc, p) => ({ done: acc.done + p.done, total: acc.total + p.total }),
+    { done: 0, total: 0 }
+  );
+  const sr = entry.detail?.shoulderrehab;
+  return { done: daily.done + (sr?.done ?? 0), total: daily.total + (sr?.total ?? 0) };
 }
 
 export function weekStartMonday(dateStr: string): string {

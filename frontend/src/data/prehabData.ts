@@ -126,7 +126,7 @@ export const PREHAB_SECTIONS: PrehabSectionDef[] = [
     id: "shoulderrehab",
     label: "Shoulder Rehab",
     icon: "🩺",
-    daily: false, // Adham's clinician block: 2–3×/wk, rest day between — shown but excluded from the daily %
+    daily: false, // Adham's clinician block: 2–3×/wk. daily:false keeps it out of the 3 sheet section-columns, but it DOES count toward the overall total/% (see countsTowardTotal, user decision 17 Aug 2026)
     exercises: [
       { id: "sr-prone-ha", name: "Prone Horizontal Abduction", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["prone", "arms out → arch overhead", "blades back+down"], note: "Adham · PhysiApp hjixuzwx · 2–3×/wk · add weight to progress", weightStep: 0.5 },
       { id: "sr-prone-l", name: "Prone L Raise (weighted ball)", kind: "loaded", sets: 3, prescription: "10 reps · 1s hold", tags: ["lower trap", "elbows to 90°", "palms face in"], weightStep: 0.5 },

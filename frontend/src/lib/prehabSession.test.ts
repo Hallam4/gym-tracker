@@ -4,7 +4,7 @@ import {
   emptyDayState, rollIfNewDay, isExerciseDone,
   sectionProgress, overallProgress, buildLogEntry,
   clampLevel, activeExercise, DayState,
-  weekStartMonday, shoulderRehabThisWeek, LogEntry,
+  weekStartMonday, shoulderRehabThisWeek, LogEntry, sessionTotal,
 } from "./prehabSession";
 
 const srExercise = PREHAB_SECTIONS[0].exercises[0]; // sr-prone-ha from shoulderrehab, sets: 3
@@ -37,9 +37,9 @@ describe("prehabSession", () => {
     expect(sectionProgress("shoulders", state)).toEqual({ done: 1, total: 2 });
   });
 
-  it("overallProgress sums across all sections (5 total)", () => {
+  it("overallProgress sums daily sections + shoulder rehab (excludes assessment)", () => {
     const state = { date: "d", entries: { "single-leg-stand": { setsDone: 1 } } };
-    expect(overallProgress(state)).toEqual({ done: 1, total: 7 });
+    expect(overallProgress(state)).toEqual({ done: 1, total: 14 }); // 2+4+1 daily + 7 rehab
   });
 
   it("buildLogEntry captures date + per-section + overall", () => {
@@ -47,7 +47,7 @@ describe("prehabSession", () => {
     const entry = buildLogEntry(state);
     expect(entry.date).toBe("2026-06-29");
     expect(entry.done).toBe(1);
-    expect(entry.total).toBe(7);
+    expect(entry.total).toBe(14); // rehab now counts toward the total
     expect(entry.sections.proprioception).toEqual({ done: 1, total: 1 });
   });
 
@@ -102,9 +102,9 @@ describe("prehabSession", () => {
   it("overallProgress and buildLogEntry exclude the non-daily assessment section", () => {
     const state = { date: "d", entries: {} };
     expect(PREHAB_SECTIONS.length).toBe(5);            // 5 sections exist…
-    expect(overallProgress(state)).toEqual({ done: 0, total: 7 }); // …but only 7 daily exercises count
+    expect(overallProgress(state)).toEqual({ done: 0, total: 14 }); // …7 daily + 7 rehab; assessment (1) excluded
     const entry = buildLogEntry(state);
-    expect(entry.total).toBe(7);
+    expect(entry.total).toBe(14);
     expect(entry.sections.assessment).toBeUndefined();
   });
 
@@ -136,10 +136,37 @@ describe("buildLogEntry — detail payload", () => {
     expect(e.detail!.shoulderrehab).toEqual({ done: 7, total: 7 });
   });
 
-  it("keeps the daily sections list and total unchanged (shoulder-rehab excluded)", () => {
+  it("keeps the 3 sheet section-columns but counts rehab toward the total", () => {
     const e = buildLogEntry(day({ "sr-scaption": { setsDone: 3, weight: "5" } }));
     expect(Object.keys(e.sections)).toEqual(["shoulders", "lowerback", "proprioception"]);
-    expect(e.done).toBe(0);
+    expect(e.done).toBe(1);   // sr-scaption (rehab) now counts toward the overall total
+    expect(e.total).toBe(14);
+    expect(e.detail!.shoulderrehab).toEqual({ done: 1, total: 7 });
+  });
+});
+
+describe("sessionTotal — displayed total incl. shoulder rehab (robust to older rows)", () => {
+  const mk = (over: Partial<LogEntry>): LogEntry => ({
+    date: "d", done: 0, total: 0,
+    sections: { shoulders: { done: 0, total: 2 }, lowerback: { done: 0, total: 4 }, proprioception: { done: 0, total: 1 } } as any,
+    ...over,
+  });
+
+  it("adds shoulder rehab to the daily columns (Aug-13-style row saved as Total=0/7)", () => {
+    const entry = mk({ done: 0, total: 7, detail: { shoulderrehab: { done: 6, total: 7 }, weights: {} } });
+    expect(sessionTotal(entry)).toEqual({ done: 6, total: 14 });
+  });
+
+  it("a full rehab-only day reads 7/14 (not complete — old prehab still undone)", () => {
+    const entry = mk({ done: 0, total: 7, detail: { shoulderrehab: { done: 7, total: 7 }, weights: {} } });
+    const t = sessionTotal(entry);
+    expect(t).toEqual({ done: 7, total: 14 });
+    expect(t.done === t.total).toBe(false);
+  });
+
+  it("equals the daily columns when there is no rehab detail (older prehab-only rows)", () => {
+    const entry = mk({ done: 9, total: 9, sections: { shoulders: { done: 4, total: 4 }, lowerback: { done: 4, total: 4 }, proprioception: { done: 1, total: 1 } } as any });
+    expect(sessionTotal(entry)).toEqual({ done: 9, total: 9 });
   });
 });
 
